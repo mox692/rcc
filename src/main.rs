@@ -9,6 +9,7 @@ fn main() {
         println!("argc is {}, not 2", args.len());
         return;
     }
-    codegen();
+    let code: i8 = args[1].parse().unwrap();
+    codegen(code);
     return;
 }

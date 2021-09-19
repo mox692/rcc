@@ -1,7 +1,7 @@
 use std::error::Error;
 
 // ref: https://keens.github.io/blog/2018/12/08/rustnomoju_runotsukaikata_2018_editionhan/
-use crate::tokenize::Token;
+use crate::parse::Node;
 
 // stringをnumに変換する
 pub fn string_to_num(string: &String) -> i32 {
@@ -11,16 +11,28 @@ pub fn string_to_num(string: &String) -> i32 {
     }
 }
 
-pub fn codegen(token: Vec<Token>) {
+pub fn codegen(node: Node) {
+    let mut f = create_file("./gen.s");
     // put start up.
-    println!(".text");
-    println!(".global main");
-    println!("main:");
-    println!("pushq %rbp");
-    println!("movq %rsp, %rbp");
+    writeln!(f, ".text");
+    writeln!(f, ".global main");
+    writeln!(f, "main:");
+    writeln!(f, "pushq %rbp");
+    writeln!(f, "movq %rsp, %rbp");
 
-    println!("movq $4, %rax");
+    writeln!(f, "movq $4, %rax");
 
-    println!("pop %rbp");
-    println!("ret");
+    writeln!(f, "pop %rbp");
+    writeln!(f, "ret");
+}
+
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::prelude::*;
+
+fn create_file(path: &str) -> File {
+    match OpenOptions::new().write(true).create(true).open(path) {
+        Ok(f) => f,
+        Err(e) => panic!(e),
+    }
 }

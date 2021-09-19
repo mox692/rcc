@@ -4,10 +4,10 @@ test() {
     input=$1
     expect=$2
 
-    ./target/debug/rcc $input > tmp.s
-    gcc -o tmp tmp.s
+    ./target/debug/rcc $input
+    gcc -o gen gen.s
 
-    ./tmp
+    ./gen
 
     result=$?
     if [ $result -eq $expect ]
@@ -22,4 +22,4 @@ test() {
 test 1 1
 test 11 11
 test 45 45
-test 4+5 9
+# test 4+5 9

@@ -1,7 +1,9 @@
 mod codegen;
+mod parse;
 mod tokenize;
 
 use codegen::codegen;
+use parse::parse;
 use std::env;
 use tokenize::tokenize;
 use tokenize::Token;
@@ -22,6 +24,8 @@ fn main() {
         count += 1;
     }
 
-    // codegen(token);
+    let node = parse(token);
+
+    codegen(node);
     return;
 }

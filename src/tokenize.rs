@@ -1,8 +1,8 @@
 pub struct Token {
-    kind: TokenKind,
-    value: Option<i32>,
-    char: Option<String>,
-    next_token: Option<Box<Token>>,
+    pub kind: TokenKind,
+    pub value: Option<i32>,
+    pub char: Option<String>,
+    pub next_token: Option<Box<Token>>,
 }
 impl Token {
     fn new_token(kind: TokenKind, value: Option<i32>, char: Option<String>) -> Token {
@@ -16,11 +16,21 @@ impl Token {
     }
 }
 
-enum TokenKind {
+pub enum TokenKind {
     INI,
     NUM,
     PUNCT,
     EOF,
+}
+impl std::fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            TokenKind::EOF => write!(f, "EOF"),
+            TokenKind::INI => write!(f, "INI"),
+            TokenKind::NUM => write!(f, "NUM"),
+            TokenKind::PUNCT => write!(f, "PUNCT"),
+        }
+    }
 }
 
 pub fn tokenize(string: &String) -> Vec<Token> {
@@ -42,6 +52,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
         if ind == len {
             println!("all read done!!!");
             let tok = Token::new_token(TokenKind::EOF, None, None);
+            tok_vec.push(tok);
             break;
         }
         let char = string.chars().nth(ind).unwrap();

@@ -16,6 +16,12 @@ fn main() {
 
     let token: Vec<Token> = tokenize(input);
 
-    codegen(token);
+    let mut count = 0;
+    for tok in token.iter() {
+        println!("count: {}, kind: {}", count, tok.kind);
+        count += 1;
+    }
+
+    // codegen(token);
     return;
 }

@@ -22,3 +22,4 @@ test() {
 test 1 1
 test 11 11
 test 45 45
+test 4+5 9

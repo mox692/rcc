@@ -1,7 +1,10 @@
 mod codegen;
+mod tokenize;
 
 use codegen::codegen;
 use std::env;
+use tokenize::tokenize;
+use tokenize::Token;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -9,7 +12,10 @@ fn main() {
         println!("argc is {}, not 2", args.len());
         return;
     }
-    let code: i8 = args[1].parse().unwrap();
-    codegen(code);
+    let input: &String = &args[1];
+
+    let token: Vec<Token> = tokenize(input);
+
+    codegen(token);
     return;
 }

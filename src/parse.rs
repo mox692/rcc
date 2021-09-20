@@ -3,6 +3,9 @@ use crate::tokenize::Token;
 pub struct Node {
     pub kind: NodeKind,
 }
+impl Node {
+    fn new_node() {}
+}
 
 pub enum NodeKind {
     Node,

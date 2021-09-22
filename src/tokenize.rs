@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Token {
     pub kind: TokenKind,
     // Only used by NUM_TOKEN, and int other types always 0.
@@ -17,6 +18,10 @@ impl Token {
     }
 }
 
+#[derive(Clone)]
+struct Tokens(Vec<Token>);
+
+#[derive(Copy, Clone)]
 pub enum TokenKind {
     INI,
     NUM,
@@ -33,6 +38,13 @@ impl std::fmt::Display for TokenKind {
         }
     }
 }
+// TODO: check.
+impl PartialEq for TokenKind {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+impl Eq for TokenKind {}
 
 pub fn tokenize(string: &String) -> Vec<Token> {
     let mut ind = 0;
@@ -91,4 +103,33 @@ pub fn tokenize(string: &String) -> Vec<Token> {
         panic!("something wrong...")
     }
     return tok_vec;
+}
+
+#[derive(Clone)]
+pub struct TokenReader {
+    pub tokens: Vec<Token>,
+    pub cur: i32,
+}
+impl TokenReader {
+    // return cur's index Token.
+    pub fn cur_tok(&self) -> Token {
+        return self.tokens[self.cur as usize].clone();
+    }
+    // increment cur, and return its self
+    pub fn next_tok(&mut self) -> &mut Self {
+        self.next();
+        return self;
+    }
+
+    // next counts up current position.
+    pub fn next(&mut self) {
+        self.cur += 1;
+    }
+}
+
+pub fn NewTokenReader(token: Vec<Token>) -> TokenReader {
+    return TokenReader {
+        tokens: token,
+        cur: 0,
+    };
 }

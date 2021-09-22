@@ -6,6 +6,7 @@ use codegen::codegen;
 use parse::parse;
 use std::env;
 use tokenize::tokenize;
+use tokenize::NewTokenReader;
 use tokenize::Token;
 
 fn main() {
@@ -17,9 +18,16 @@ fn main() {
     let input: &String = &args[1];
 
     let token: Vec<Token> = tokenize(input);
+    // debug.
     debug_tokens(&token);
 
-    let node = parse(token);
+    let mut tokenReader = NewTokenReader(token);
+
+    let mut node = parse(&mut tokenReader);
+    if node.is_none() {
+        panic!("Node Not Found!!")
+    }
+    node = node.unwrap();
 
     codegen(node);
     return;

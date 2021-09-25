@@ -76,7 +76,6 @@ pub fn tokenize(string: &String) -> Vec<Token> {
 
         // null文字だったら.
         if char.eq(&'\n') {
-            println!("all read done!!!");
             let tok = Token::new_token(TokenKind::EOF, 0, String::from(""));
             tok_vec.push(tok);
             break;
@@ -84,11 +83,6 @@ pub fn tokenize(string: &String) -> Vec<Token> {
 
         // tokenize punct.
         if char.is_ascii_punctuation() {
-            println!(
-                "{} is punct!, cur is {}",
-                string.chars().nth(ind).unwrap(),
-                char
-            );
             let tok = Token::new_token(TokenKind::PUNCT, 0, String::from("+"));
             tok_vec.push(tok);
             ind += 1;
@@ -105,7 +99,6 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                     break;
                 }
                 let char = string.chars().nth(ind).unwrap();
-                println!("ind is {} , char is {}", ind, char);
                 // 数値でない or 終端に達したら.
                 if !char.is_ascii_digit() {
                     break;
@@ -113,7 +106,6 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 cur_num = cur_num * 10 + char.to_digit(10).unwrap() as i32;
                 ind += 1;
             }
-            println!("cur_num is {}", cur_num);
             let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""));
             tok_vec.push(tok);
             continue;

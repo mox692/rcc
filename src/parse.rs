@@ -14,6 +14,25 @@ pub enum NodeKind {
     ND_NUM,
     ND_ADD,
 }
+impl NodeKind {
+    fn to_string(&self) -> &str {
+        match self {
+            &NodeKind::ND_ADD => "ADD",
+            &NodeKind::ND_NUM => "NUM",
+            _ => {
+                panic!("Not impl NodeKind::to_string")
+            }
+        }
+    }
+}
+impl PartialEq for NodeKind {
+    // もっといい実装があるかも.
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(other.to_string())
+    }
+}
+impl Eq for NodeKind {}
+
 impl std::fmt::Display for NodeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {

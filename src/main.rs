@@ -21,7 +21,7 @@ fn main() {
     let input: &String = &args[1];
 
     let token: Vec<Token> = tokenize(input);
-    // debug.
+    // debug token.
     debug_tokens(&token);
 
     let mut tokenReader = NewTokenReader(token);

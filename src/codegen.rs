@@ -1,4 +1,6 @@
-use std::error::Error;
+use crate::parse::NodeKind;
+use std::fs::File;
+use std::io::prelude::*;
 
 // ref: https://keens.github.io/blog/2018/12/08/rustnomoju_runotsukaikata_2018_editionhan/
 use crate::parse::Node;
@@ -20,19 +22,40 @@ pub fn codegen(node: &Node) {
     writeln!(f, "pushq %rbp");
     writeln!(f, "movq %rsp, %rbp");
 
-    writeln!(f, "movq $4, %rax");
+    gen(node, &mut f);
 
+    writeln!(f, "pop %rax");
     writeln!(f, "pop %rbp");
     writeln!(f, "ret");
 }
 
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
+fn gen(node: &Node, f: &mut File) {
+    if node.kind == NodeKind::ND_NUM {
+        writeln!(f, "push ${}", node.val);
+        return;
+    }
+
+    gen(node.l.as_ref().unwrap().as_ref(), f);
+    gen(node.r.as_ref().unwrap().as_ref(), f);
+
+    writeln!(f, "pop %rdi"); // right side.
+    writeln!(f, "pop %rax"); // left side.
+
+    match node.kind {
+        NodeKind::ND_ADD => {
+            writeln!(f, "add %rdi, %rax");
+        }
+        _ => {
+            panic!("Unsapported node kind found");
+        }
+    }
+    writeln!(f, "push %rax");
+}
 
 fn create_file(path: &str) -> File {
-    match OpenOptions::new().write(true).create(true).open(path) {
+    let f = match File::create(path) {
         Ok(f) => f,
         Err(e) => panic!(e),
-    }
+    };
+    return f;
 }

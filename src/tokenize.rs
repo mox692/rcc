@@ -118,6 +118,12 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             tok_vec.push(tok);
             continue;
         }
+
+        // whitespaceは飛ばす
+        if char.is_whitespace() {
+            ind += 1;
+            continue;
+        }
         panic!("something wrong...")
     }
     return tok_vec;

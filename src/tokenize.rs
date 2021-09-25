@@ -86,6 +86,8 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             let tok = match char {
                 '+' => Token::new_token(TokenKind::PUNCT, 0, String::from("+")),
                 '-' => Token::new_token(TokenKind::PUNCT, 0, String::from("-")),
+                '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
+                '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
                 _ => {
                     panic!("Unknown token.");
                 }

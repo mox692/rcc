@@ -14,13 +14,17 @@ pub enum NodeKind {
     ND_NUM,
     ND_ADD,
     ND_SUB,
+    ND_MUL,
+    ND_DIV,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
         match self {
+            &NodeKind::ND_NUM => "NUM",
             &NodeKind::ND_ADD => "ADD",
             &NodeKind::ND_SUB => "SUB",
-            &NodeKind::ND_NUM => "NUM",
+            &NodeKind::ND_MUL => "MUL",
+            &NodeKind::ND_DIV => "DIV",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -38,8 +42,11 @@ impl Eq for NodeKind {}
 impl std::fmt::Display for NodeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            NodeKind::ND_ADD => write!(f, "ND_ADD"),
             NodeKind::ND_NUM => write!(f, "ND_NUM"),
+            NodeKind::ND_ADD => write!(f, "ND_ADD"),
+            NodeKind::ND_SUB => write!(f, "ND_SUB"),
+            NodeKind::ND_MUL => write!(f, "ND_MUL"),
+            NodeKind::ND_DIV => write!(f, "ND_DIV"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -78,10 +85,34 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
     };
 }
 
-// generate ND_ADD or ND_SUB node.
-fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
+fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
     // はじめのtokenがnum nodeと決まりきってるので.
     let mut node = gen_unary_node(NodeKind::ND_NUM, tok);
+
+    loop {
+        match tok.cur_tok().char.as_str() {
+            "*" => {
+                node = Some(Box::new(gen_binary_node(
+                    NodeKind::ND_MUL,
+                    node,
+                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                )))
+            }
+            "/" => {
+                node = Some(Box::new(gen_binary_node(
+                    NodeKind::ND_DIV,
+                    node,
+                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                )))
+            }
+            _ => break,
+        }
+    }
+    return node;
+}
+// generate ND_ADD or ND_SUB node.
+fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node = parse_mul_div(tok);
     // process '+', '-' token.
     loop {
         match tok.cur_tok().char.as_str() {
@@ -89,14 +120,14 @@ fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_ADD,
                     node,
-                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                    parse_mul_div(tok.next_tok()),
                 )))
             }
             "-" => {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_SUB,
                     node,
-                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                    parse_mul_div(tok.next_tok()),
                 )))
             }
             _ => break,

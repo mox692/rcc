@@ -48,6 +48,13 @@ fn gen(node: &Node, f: &mut File) {
         NodeKind::ND_SUB => {
             writeln!(f, "sub %rdi, %rax");
         }
+        NodeKind::ND_MUL => {
+            writeln!(f, "imul %rdi, %rax");
+        }
+        NodeKind::ND_DIV => {
+            writeln!(f, "cqo");
+            writeln!(f, "idiv %rdi");
+        }
         _ => {
             panic!("Unsapported node kind found");
         }

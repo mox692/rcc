@@ -167,13 +167,60 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
+// assing = expr ( "=" expr )*
+fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
+    // 左辺をparse.
+    let mut node = parse_expr(tok);
+    loop {
+        if tok.expect("=") {
+            // 右辺をparse.
+            node = parse_expr(tok.next_tok());
+        } else {
+            break;
+        }
+    }
+    return node;
+}
+
+// stmt = assign | expr
+fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let node: Option<Box<Node>>;
+    // assignなstmtかどうかcheck.
+    // 今の文法だと、この条件であればassignのはず.
+    if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
+        node = parse_assign(tok);
+        return node;
+    }
+
+    // exprをparse.
+    node = parse_expr(tok);
+    return node;
+}
+
+// program = stmt*
+fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
+    let mut nodes: Vec<Box<Node>> = Vec::new();
+    loop {
+        if tok.cur_tok().char == "\0" {
+            break;
+        }
+        let node = parse_stmt(tok);
+        nodes.push(node.unwrap());
+        tok.next();
+    }
+    return nodes;
+}
+
 // generate several nodes, and return last Node.
 // TODO: consider other nodes.
-// node = expr(expr)*
+// node = program
 pub fn parse(tok: &mut TokenReader) -> Option<Box<Node>> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
     let mut node: Option<Box<Node>>;
+
+    // parse_program(tok);
+
     // expr(;)毎にparseしていき、最後のnodeを評価対象にする.
     loop {
         node = parse_expr(tok);

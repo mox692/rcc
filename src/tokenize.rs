@@ -169,6 +169,9 @@ impl TokenReader {
         self.next();
         return self;
     }
+    pub fn get_next_tok(&self) -> Token {
+        return self.tokens[self.cur + 1 as usize].clone();
+    }
     // next counts up current position.
     pub fn next(&mut self) {
         self.cur += 1;

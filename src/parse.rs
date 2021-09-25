@@ -1,15 +1,29 @@
-use crate::tokenize::{Token, TokenKind, TokenReader};
+use std::usize;
 
+use crate::tokenize::{TokenKind, TokenReader};
+
+#[derive(Clone)]
 pub struct Node {
     pub kind: NodeKind,
     pub l: Option<Box<Node>>,
     pub r: Option<Box<Node>>,
     pub val: i32,
 }
-
+#[derive(Clone)]
 pub enum NodeKind {
     ND_NUM,
     ND_ADD,
+}
+impl std::fmt::Display for NodeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            NodeKind::ND_ADD => write!(f, "ND_ADD"),
+            NodeKind::ND_NUM => write!(f, "ND_NUM"),
+            _ => {
+                panic!("Invalid Node Kind.")
+            }
+        }
+    }
 }
 
 fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
@@ -19,7 +33,7 @@ fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
             kind: NodeKind::ND_NUM,
             l: None,
             r: None,
-            val: 0,
+            val: tok.cur_tok().value,
         }));
         tok.next();
         return node;
@@ -78,4 +92,32 @@ pub fn consume_initial_tok(tok: &mut TokenReader) {
     tok.next();
 }
 
-pub fn debug_nodes(node: &Node) {}
+pub fn debug_nodes(node: &Node) {
+    println!("////////NODE DEBUG START////////");
+    let mut depth = 0;
+    read_node(node, &mut depth);
+    println!("////////NODE DEBUG END////////");
+}
+
+pub fn read_node(node: &Node, depth: &mut usize) {
+    print_node_info(node, depth);
+    if node.l.is_none() && node.r.is_none() {
+        return;
+    }
+    *depth += 1;
+    read_node(node.l.as_ref().unwrap(), depth);
+    read_node(node.r.as_ref().unwrap(), depth);
+    *depth -= 1;
+}
+
+fn print_node_info(node: &Node, depth: &mut usize) {
+    print!("{}", " ".repeat(*depth * 2));
+    match node.kind {
+        NodeKind::ND_NUM => {
+            println!("kind: {}, val: {}", node.kind, node.val);
+        }
+        _ => {
+            println!("kind: {}", node.kind);
+        }
+    }
+}

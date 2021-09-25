@@ -30,7 +30,9 @@ fn main() {
     if node.is_none() {
         panic!("Node Not Found!!")
     }
-    debug_nodes(&node);
+    // debug node.
+    debug_nodes(node.as_ref().unwrap().as_ref());
+
     codegen(node.unwrap().as_ref());
     return;
 }

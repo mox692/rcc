@@ -75,8 +75,8 @@ pub fn tokenize(string: &String) -> Vec<Token> {
         let char = string.chars().nth(ind).unwrap();
 
         // null文字だったら.
-        if char.eq(&'\n') {
-            let tok = Token::new_token(TokenKind::EOF, 0, String::from(""));
+        if char.eq(&'\0') {
+            let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"));
             tok_vec.push(tok);
             break;
         }
@@ -88,6 +88,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 '-' => Token::new_token(TokenKind::PUNCT, 0, String::from("-")),
                 '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
                 '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
+                ';' => Token::new_token(TokenKind::PUNCT, 0, String::from(";")),
                 _ => {
                     panic!("Unknown token.");
                 }
@@ -132,7 +133,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
 #[derive(Clone)]
 pub struct TokenReader {
     pub tokens: Vec<Token>,
-    pub cur: i32,
+    pub cur: usize,
 }
 impl TokenReader {
     // return cur's index Token.
@@ -144,10 +145,17 @@ impl TokenReader {
         self.next();
         return self;
     }
-
     // next counts up current position.
     pub fn next(&mut self) {
         self.cur += 1;
+    }
+    // cur + 1' s token.
+    pub fn expect(&self, s: &str) -> bool {
+        if self.tokens[self.cur].char == s {
+            true
+        } else {
+            false
+        }
     }
 }
 

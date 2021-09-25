@@ -30,11 +30,22 @@ pub fn codegen(node: &Node) {
 }
 
 fn gen(node: &Node, f: &mut File) {
+    /*
+        gen from unary node.
+    */
     if node.kind == NodeKind::ND_NUM {
         writeln!(f, "push ${}", node.val);
         return;
     }
+    // exprは展開してやるだけ
+    if node.kind == NodeKind::ND_EXPR {
+        gen(node.l.as_ref().unwrap().as_ref(), f);
+        return;
+    }
 
+    /*
+        gen from binary node.
+    */
     gen(node.l.as_ref().unwrap().as_ref(), f);
     gen(node.r.as_ref().unwrap().as_ref(), f);
 

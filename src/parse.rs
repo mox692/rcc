@@ -16,6 +16,7 @@ pub enum NodeKind {
     ND_SUB,
     ND_MUL,
     ND_DIV,
+    ND_EXPR,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -25,6 +26,7 @@ impl NodeKind {
             &NodeKind::ND_SUB => "SUB",
             &NodeKind::ND_MUL => "MUL",
             &NodeKind::ND_DIV => "DIV",
+            &NodeKind::ND_EXPR => "EXPR",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -47,6 +49,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_SUB => write!(f, "ND_SUB"),
             NodeKind::ND_MUL => write!(f, "ND_MUL"),
             NodeKind::ND_DIV => write!(f, "ND_DIV"),
+            NodeKind::ND_EXPR => write!(f, "ND_EXPR"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -54,11 +57,22 @@ impl std::fmt::Display for NodeKind {
     }
 }
 
+// unary_node = num
 fn gen_unary_node(kind: NodeKind, tok: &mut TokenReader) -> Option<Box<Node>> {
     match kind {
         NodeKind::ND_NUM => return gen_num(tok),
         _ => panic!("Invalid node kind."),
     }
+}
+
+fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<Node>> {
+    let node = Some(Box::new(Node {
+        kind: NodeKind::ND_EXPR,
+        l: expr_node,
+        r: None,
+        val: 0,
+    }));
+    return node;
 }
 
 fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
@@ -85,6 +99,7 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
     };
 }
 
+// mul_div = unary ( "*" unary | "/" unary )*
 fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
     // はじめのtokenがnum nodeと決まりきってるので.
     let mut node = gen_unary_node(NodeKind::ND_NUM, tok);
@@ -110,7 +125,9 @@ fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
     }
     return node;
 }
+
 // generate ND_ADD or ND_SUB node.
+// add_sub = mul_div("+" mul_div | "-" mul_div)*
 fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = parse_mul_div(tok);
     // process '+', '-' token.
@@ -138,16 +155,32 @@ fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
 }
 
 // generate expression.
+// expr = add_sub ";"
 fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let node = parse_add_sub(tok);
+    let mut node = parse_add_sub(tok);
+    if tok.expect(";") {
+        node = gen_expr(node, tok)
+    } else {
+        panic!("expect ';', but not found.")
+    }
+    tok.next();
     return node;
 }
 
-// Get tokens, and convert to Node.
+// generate several nodes, and return last Node.
+// TODO: consider other nodes.
+// node = expr(expr)*
 pub fn parse(tok: &mut TokenReader) -> Option<Box<Node>> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
-    let node = parse_expr(tok);
+    let mut node: Option<Box<Node>>;
+    // expr(;)毎にparseしていき、最後のnodeを評価対象にする.
+    loop {
+        node = parse_expr(tok);
+        if tok.expect("\0") {
+            break;
+        }
+    }
     return node;
 }
 
@@ -171,9 +204,19 @@ pub fn debug_nodes(flag: bool, node: &Node) {
 
 pub fn read_node(node: &Node, depth: &mut usize) {
     print_node_info(node, depth);
+    // mainly for ND_NUM.
     if node.l.is_none() && node.r.is_none() {
         return;
     }
+
+    // for ND_EXPR.
+    if node.kind == NodeKind::ND_EXPR {
+        *depth += 1;
+        read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+        return;
+    }
+
     *depth += 1;
     read_node(node.l.as_ref().unwrap(), depth);
     read_node(node.r.as_ref().unwrap(), depth);

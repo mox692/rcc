@@ -20,7 +20,7 @@ fn main() {
     let mut debug_flag = false;
 
     // (tokenizeがしやすくなるため)終端文字を加える.
-    args[1].push('\n');
+    args[1].push('\0');
     if arg_len == 3 {
         debug_flag = if args[2].eq("true") { true } else { false };
     }
@@ -36,6 +36,7 @@ fn main() {
         panic!("Node Not Found!!")
     }
     // debug node.
+    // TODO: update for multiple nodes.(現在は先頭のnodeしか見てない.)
     debug_nodes(debug_flag, node.as_ref().unwrap().as_ref());
 
     // generate assembly

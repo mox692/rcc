@@ -11,7 +11,7 @@ pub fn string_to_num(string: &String) -> i32 {
     }
 }
 
-pub fn codegen(node: Node) {
+pub fn codegen(node: &Node) {
     let mut f = create_file("./gen.s");
     // put start up.
     writeln!(f, ".text");

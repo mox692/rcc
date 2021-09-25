@@ -3,6 +3,7 @@ mod parse;
 mod tokenize;
 
 use codegen::codegen;
+use parse::debug_nodes;
 use parse::parse;
 use std::env;
 use tokenize::tokenize;
@@ -10,11 +11,13 @@ use tokenize::NewTokenReader;
 use tokenize::Token;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         println!("argc is {}, not 2", args.len());
         return;
     }
+    // (tokenizeがしやすくなるため)終端文字を加える.
+    args[1].push('\n');
     let input: &String = &args[1];
 
     let token: Vec<Token> = tokenize(input);
@@ -27,9 +30,8 @@ fn main() {
     if node.is_none() {
         panic!("Node Not Found!!")
     }
-    node = node.unwrap();
-
-    codegen(node);
+    debug_nodes(&node);
+    codegen(node.unwrap().as_ref());
     return;
 }
 

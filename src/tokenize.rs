@@ -28,6 +28,16 @@ pub enum TokenKind {
     PUNCT,
     EOF,
 }
+impl TokenKind {
+    fn to_string(&self) -> &str {
+        match self {
+            TokenKind::EOF => "EOF",
+            TokenKind::INI => "INI",
+            TokenKind::NUM => "NUM",
+            TokenKind::PUNCT => "PUNCT",
+        }
+    }
+}
 impl std::fmt::Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -38,17 +48,16 @@ impl std::fmt::Display for TokenKind {
         }
     }
 }
-// TODO: check.
 impl PartialEq for TokenKind {
+    // もっといい実装があるかも.
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.to_string().eq(other.to_string())
     }
 }
 impl Eq for TokenKind {}
 
 pub fn tokenize(string: &String) -> Vec<Token> {
     let mut ind = 0;
-    // stringが終端文字を含まないので、このlenを使って終端を判断する.
     let len = string.len();
     // tok vec.
     let mut tok_vec = Vec::<Token>::new();
@@ -63,21 +72,30 @@ pub fn tokenize(string: &String) -> Vec<Token> {
     tok_vec.push(tok);
 
     loop {
-        if ind >= len - 1 {
+        let char = string.chars().nth(ind).unwrap();
+
+        // null文字だったら.
+        if char.eq(&'\n') {
             println!("all read done!!!");
             let tok = Token::new_token(TokenKind::EOF, 0, String::from(""));
             tok_vec.push(tok);
             break;
         }
-        let char = string.chars().nth(ind).unwrap();
 
+        // tokenize punct.
         if char.is_ascii_punctuation() {
-            println!("{} is punct!", string.chars().nth(ind).unwrap());
+            println!(
+                "{} is punct!, cur is {}",
+                string.chars().nth(ind).unwrap(),
+                char
+            );
             let tok = Token::new_token(TokenKind::PUNCT, 0, String::from("+"));
             tok_vec.push(tok);
             ind += 1;
             continue;
         }
+
+        // tokenize num.
         if char.is_ascii_digit() {
             let mut cur_num: i32 = char.to_digit(10).unwrap() as i32;
             ind += 1;

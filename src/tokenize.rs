@@ -27,6 +27,7 @@ pub enum TokenKind {
     NUM,
     PUNCT,
     EOF,
+    IDENT,
 }
 impl TokenKind {
     fn to_string(&self) -> &str {
@@ -35,6 +36,7 @@ impl TokenKind {
             TokenKind::INI => "INI",
             TokenKind::NUM => "NUM",
             TokenKind::PUNCT => "PUNCT",
+            TokenKind::IDENT => "IDENT",
         }
     }
 }
@@ -45,6 +47,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::INI => write!(f, "INI"),
             TokenKind::NUM => write!(f, "NUM"),
             TokenKind::PUNCT => write!(f, "PUNCT"),
+            TokenKind::IDENT => write!(f, "IDENT"),
         }
     }
 }
@@ -74,7 +77,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
     loop {
         let char = string.chars().nth(ind).unwrap();
 
-        // null文字だったら.
+        // terminated character.
         if char.eq(&'\0') {
             let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"));
             tok_vec.push(tok);
@@ -89,6 +92,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
                 '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
                 ';' => Token::new_token(TokenKind::PUNCT, 0, String::from(";")),
+                '=' => Token::new_token(TokenKind::PUNCT, 0, String::from("=")),
                 _ => {
                     panic!("Unknown token.");
                 }
@@ -104,6 +108,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             ind += 1;
             loop {
                 // 最後の文字をreadし終わったら
+                // TODO: remove len.
                 if ind == len {
                     break;
                 }
@@ -116,6 +121,25 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 ind += 1;
             }
             let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""));
+            tok_vec.push(tok);
+            continue;
+        }
+
+        // local variable.
+        // ひとまずアルファベットで構成された文字列なら許可する.
+        if char.is_ascii_alphabetic() {
+            let mut cur_str: String = char.to_string();
+            ind += 1;
+            loop {
+                let char = string.chars().nth(ind).unwrap();
+                // 数値でない or 終端に達したら.
+                if !char.is_alphabetic() {
+                    break;
+                }
+                cur_str.push(char);
+                ind += 1;
+            }
+            let tok = Token::new_token(TokenKind::IDENT, 0, cur_str);
             tok_vec.push(tok);
             continue;
         }
@@ -178,7 +202,7 @@ pub fn debug_tokens(flag: bool, tokens: &Vec<Token>) {
             TokenKind::NUM => {
                 println!("index: {}, kind: {}, val: {}", count, tok.kind, tok.value,)
             }
-            TokenKind::PUNCT => {
+            TokenKind::PUNCT | TokenKind::IDENT => {
                 println!("index: {}, kind: {}, char: {}", count, tok.kind, tok.char,)
             }
             _ => {

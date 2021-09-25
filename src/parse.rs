@@ -13,11 +13,13 @@ pub struct Node {
 pub enum NodeKind {
     ND_NUM,
     ND_ADD,
+    ND_SUB,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
         match self {
             &NodeKind::ND_ADD => "ADD",
+            &NodeKind::ND_SUB => "SUB",
             &NodeKind::ND_NUM => "NUM",
             _ => {
                 panic!("Not impl NodeKind::to_string")
@@ -45,6 +47,13 @@ impl std::fmt::Display for NodeKind {
     }
 }
 
+fn gen_unary_node(kind: NodeKind, tok: &mut TokenReader) -> Option<Box<Node>> {
+    match kind {
+        NodeKind::ND_NUM => return gen_num(tok),
+        _ => panic!("Invalid node kind."),
+    }
+}
+
 fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
     // num nodeが複数続くことは文法上ありえないので、そのまま返す.
     if tok.cur_tok().kind.eq(&TokenKind::NUM) {
@@ -60,9 +69,9 @@ fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
     return None;
 }
 
-fn gen_add(tok: &mut TokenReader, l: Option<Box<Node>>, r: Option<Box<Node>>) -> Node {
+fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -> Node {
     return Node {
-        kind: NodeKind::ND_ADD,
+        kind: kind,
         l: l,
         r: r,
         val: 0,
@@ -71,19 +80,27 @@ fn gen_add(tok: &mut TokenReader, l: Option<Box<Node>>, r: Option<Box<Node>>) ->
 
 // generate ND_ADD or ND_SUB node.
 fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let mut node = gen_num(tok);
-    // process '+' token.
+    // はじめのtokenがnum nodeと決まりきってるので.
+    let mut node = gen_unary_node(NodeKind::ND_NUM, tok);
+    // process '+', '-' token.
     loop {
-        if tok.cur_tok().char.as_str() == "+" {
-            // 第一引数には更新前のtokのcloneを渡して、第二引数に
-            node = Some(Box::new(gen_add(
-                &mut tok.clone(),
-                node,
-                gen_num(tok.next_tok()),
-            )))
-        } else {
-            break;
-        }
+        match tok.cur_tok().char.as_str() {
+            "+" => {
+                node = Some(Box::new(gen_binary_node(
+                    NodeKind::ND_ADD,
+                    node,
+                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                )))
+            }
+            "-" => {
+                node = Some(Box::new(gen_binary_node(
+                    NodeKind::ND_SUB,
+                    node,
+                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                )))
+            }
+            _ => break,
+        };
     }
 
     return node;
@@ -111,7 +128,10 @@ pub fn consume_initial_tok(tok: &mut TokenReader) {
     tok.next();
 }
 
-pub fn debug_nodes(node: &Node) {
+pub fn debug_nodes(flag: bool, node: &Node) {
+    if !flag {
+        return;
+    }
     println!("////////NODE DEBUG START////////");
     let mut depth = 0;
     read_node(node, &mut depth);

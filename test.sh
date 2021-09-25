@@ -25,5 +25,7 @@ test 45 45
 
 # add_sub support.
 test 4+5 9
-test 4+4+4 12
 test 12+34+31 77
+test 5-2 3
+test 15-2-7 6
+test 13+33-12+1 35

@@ -83,7 +83,13 @@ pub fn tokenize(string: &String) -> Vec<Token> {
 
         // tokenize punct.
         if char.is_ascii_punctuation() {
-            let tok = Token::new_token(TokenKind::PUNCT, 0, String::from("+"));
+            let tok = match char {
+                '+' => Token::new_token(TokenKind::PUNCT, 0, String::from("+")),
+                '-' => Token::new_token(TokenKind::PUNCT, 0, String::from("-")),
+                _ => {
+                    panic!("Unknown token.");
+                }
+            };
             tok_vec.push(tok);
             ind += 1;
             continue;
@@ -142,4 +148,28 @@ pub fn NewTokenReader(token: Vec<Token>) -> TokenReader {
         tokens: token,
         cur: 0,
     };
+}
+
+// Debug tokens which tokenizer generate.
+pub fn debug_tokens(flag: bool, tokens: &Vec<Token>) {
+    if !flag {
+        return;
+    }
+    let mut count = 0;
+    println!("////////TOKEN DEBUG START////////");
+    for tok in tokens.iter() {
+        match tok.kind {
+            TokenKind::NUM => {
+                println!("index: {}, kind: {}, val: {}", count, tok.kind, tok.value,)
+            }
+            TokenKind::PUNCT => {
+                println!("index: {}, kind: {}, char: {}", count, tok.kind, tok.char,)
+            }
+            _ => {
+                println!("index: {}, kind: {}", count, tok.kind,)
+            }
+        }
+        count += 1;
+    }
+    println!("////////TOKEN DEBUG END////////");
 }

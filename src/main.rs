@@ -6,23 +6,28 @@ use codegen::codegen;
 use parse::debug_nodes;
 use parse::parse;
 use std::env;
+use tokenize::debug_tokens;
 use tokenize::tokenize;
 use tokenize::NewTokenReader;
 use tokenize::Token;
 
 fn main() {
+    // [args]
+    // arg[1] -> source input.
+    // arg[2] -> debug flag.
     let mut args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        println!("argc is {}, not 2", args.len());
-        return;
-    }
+    let arg_len = args.len();
+    let mut debug_flag = false;
     // (tokenizeがしやすくなるため)終端文字を加える.
     args[1].push('\n');
+    if arg_len == 3 {
+        debug_flag = if args[2].eq("true") { true } else { false };
+    }
     let input: &String = &args[1];
 
     let token: Vec<Token> = tokenize(input);
     // debug token.
-    debug_tokens(&token);
+    debug_tokens(debug_flag, &token);
 
     let mut tokenReader = NewTokenReader(token);
 
@@ -31,29 +36,8 @@ fn main() {
         panic!("Node Not Found!!")
     }
     // debug node.
-    debug_nodes(node.as_ref().unwrap().as_ref());
+    debug_nodes(debug_flag, node.as_ref().unwrap().as_ref());
 
     codegen(node.unwrap().as_ref());
     return;
-}
-
-// Debug tokens which tokenizer generate.
-fn debug_tokens(tokens: &Vec<Token>) {
-    let mut count = 0;
-    println!("////////TOKEN DEBUG START////////");
-    for tok in tokens.iter() {
-        match tok.kind {
-            tokenize::TokenKind::NUM => {
-                println!("index: {}, kind: {}, val: {}", count, tok.kind, tok.value,)
-            }
-            tokenize::TokenKind::PUNCT => {
-                println!("index: {}, kind: {}, char: {}", count, tok.kind, tok.char,)
-            }
-            _ => {
-                println!("index: {}, kind: {}", count, tok.kind,)
-            }
-        }
-        count += 1;
-    }
-    println!("////////TOKEN DEBUG END////////");
 }

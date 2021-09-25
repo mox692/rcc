@@ -45,6 +45,9 @@ fn gen(node: &Node, f: &mut File) {
         NodeKind::ND_ADD => {
             writeln!(f, "add %rdi, %rax");
         }
+        NodeKind::ND_SUB => {
+            writeln!(f, "sub %rdi, %rax");
+        }
         _ => {
             panic!("Unsapported node kind found");
         }

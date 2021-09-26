@@ -38,8 +38,7 @@ test "15* 2+16/  4;" 34
 
 # multiple expression.
 test "4; 5;" 5
-test "4; 5;" 5
 test "15* 2+16/  4; 10+3*2-     6;  3 + 4 * 2;" 11
 
 # local val.
-# test "a = 3; a;" 3
+test "a = 3; a;" 3

@@ -17,16 +17,20 @@ pub enum NodeKind {
     ND_MUL,
     ND_DIV,
     ND_EXPR,
+    ND_ASSIGN,
+    ND_IDENT,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
         match self {
-            &NodeKind::ND_NUM => "NUM",
-            &NodeKind::ND_ADD => "ADD",
-            &NodeKind::ND_SUB => "SUB",
-            &NodeKind::ND_MUL => "MUL",
-            &NodeKind::ND_DIV => "DIV",
-            &NodeKind::ND_EXPR => "EXPR",
+            NodeKind::ND_NUM => "NUM",
+            NodeKind::ND_ADD => "ADD",
+            NodeKind::ND_SUB => "SUB",
+            NodeKind::ND_MUL => "MUL",
+            NodeKind::ND_DIV => "DIV",
+            NodeKind::ND_EXPR => "EXPR",
+            NodeKind::ND_IDENT => "IDENT",
+            NodeKind::ND_ASSIGN => "ND_ASSIGN",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -50,6 +54,8 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_MUL => write!(f, "ND_MUL"),
             NodeKind::ND_DIV => write!(f, "ND_DIV"),
             NodeKind::ND_EXPR => write!(f, "ND_EXPR"),
+            NodeKind::ND_IDENT => write!(f, "ND_IDENT"),
+            NodeKind::ND_ASSIGN => write!(f, "ND_ASSIGN"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -88,6 +94,15 @@ fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
         return node;
     }
     return None;
+}
+
+fn gen_ident_node(tok: &mut TokenReader) -> Node {
+    return Node {
+        kind: NodeKind::ND_IDENT,
+        l: None,
+        r: None,
+        val: 0,
+    };
 }
 
 fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -> Node {
@@ -155,8 +170,16 @@ fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
 }
 
 // generate expression.
-// expr = add_sub ";"
+// expr = ( add_sub | ident ) ";"
 fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
+    // ident
+    if tok.cur_tok().kind == TokenKind::IDENT {
+        // TODO: impl
+        let node = Some(Box::new(gen_ident_node(tok)));
+        return node;
+    }
+
+    // add_sub
     let mut node = parse_add_sub(tok);
     if tok.expect(";") {
         node = gen_expr(node, tok)
@@ -167,14 +190,19 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// assing = expr ( "=" expr )*
+// assing = ident ( "=" expr )*
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
-    // 左辺をparse.
-    let mut node = parse_expr(tok);
+    // 左辺のidentをparse.
+    let mut node = Some(Box::new(gen_ident_node(tok)));
+    println!("identnode create.");
     loop {
         if tok.expect("=") {
-            // 右辺をparse.
-            node = parse_expr(tok.next_tok());
+            // 右辺のexprをparse.
+            node = Some(Box::new(gen_binary_node(
+                NodeKind::ND_ASSIGN,
+                node,
+                parse_expr(tok.next_tok()),
+            )));
         } else {
             break;
         }
@@ -201,11 +229,15 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
 fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
     let mut nodes: Vec<Box<Node>> = Vec::new();
     loop {
+        // TODO: ここ要る?
         if tok.cur_tok().char == "\0" {
             break;
         }
         let node = parse_stmt(tok);
         nodes.push(node.unwrap());
+        if tok.cur_tok().char == "\0" {
+            break;
+        }
         tok.next();
     }
     return nodes;
@@ -214,20 +246,20 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
 // generate several nodes, and return last Node.
 // TODO: consider other nodes.
 // node = program
-pub fn parse(tok: &mut TokenReader) -> Option<Box<Node>> {
+pub fn parse(tok: &mut TokenReader) -> Vec<Box<Node>> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
-    let mut node: Option<Box<Node>>;
+    let mut node: Vec<Box<Node>> = parse_program(tok);
 
     // parse_program(tok);
 
     // expr(;)毎にparseしていき、最後のnodeを評価対象にする.
-    loop {
-        node = parse_expr(tok);
-        if tok.expect("\0") {
-            break;
-        }
-    }
+    // loop {
+    //     node = parse_expr(tok);
+    //     if tok.expect("\0") {
+    //         break;
+    //     }
+    // }
     return node;
 }
 

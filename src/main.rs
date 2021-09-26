@@ -31,16 +31,18 @@ fn main() {
     debug_tokens(debug_flag, &token);
 
     let mut tokenReader = NewTokenReader(token);
-    let mut node = parse(&mut tokenReader);
-    if node.is_none() {
+
+    let mut nodes = parse(&mut tokenReader);
+    let node_len = nodes.len();
+    if node_len == 0 {
         panic!("Node Not Found!!")
     }
     // debug node.
-    // TODO: update for multiple nodes.(現在は先頭のnodeしか見てない.)
-    debug_nodes(debug_flag, node.as_ref().unwrap().as_ref());
+    // TODO: update for multiple nodes.(現在は最後尾のNodeしか見てない.)
+    debug_nodes(debug_flag, nodes[node_len - 1].as_ref());
 
     // generate assembly
-    codegen(node.unwrap().as_ref());
+    codegen(nodes[node_len - 1].as_ref());
 
     return;
 }

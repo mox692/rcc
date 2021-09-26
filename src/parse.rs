@@ -1,6 +1,22 @@
 /*
+    memo:
     * tokenの消費はgenXXX()系の関数の引数にtok.next_tok()を渡してtokenを進めるか、
     genXXX()系の関数内でtokenを進めるようにする.(parseXXX系の中では進めないようにする.)
+*/
+
+/*
+    EBNF: ('&' express terminal symbol.)
+
+    output = program
+    program = stmt*
+    stmt = ( assign | expr ) ";"
+    assign = &ident ( "=" expr )*
+    expr = ( add_sub | &ident )
+    add_sub = mul_div( "+" mul_div | "-" mul_div )*
+    mul_div = unary ( "*" unary | "/" unary )*
+    unary = &num | &ident
+
+    ·exprには即値と変数が混在しうる.有効な変数かどうかの判定は別途行う.
 */
 
 use std::usize;
@@ -78,7 +94,7 @@ impl std::fmt::Display for NodeKind {
 // unary_node = num
 fn gen_unary_node(kind: NodeKind, tok: &mut TokenReader) -> Option<Box<Node>> {
     match kind {
-        NodeKind::ND_NUM => return gen_num(tok),
+        NodeKind::ND_NUM => return gen_num_node(tok),
         _ => panic!("Invalid node kind."),
     }
 }
@@ -94,8 +110,7 @@ fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<N
     return node;
 }
 
-fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
-    // num nodeが複数続くことは文法上ありえないので、そのまま返す.
+fn gen_num_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().kind.eq(&TokenKind::NUM) {
         let node = Some(Box::new(Node {
             kind: NodeKind::ND_NUM,
@@ -107,7 +122,7 @@ fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
         tok.next();
         return node;
     }
-    return None;
+    panic!("expect num token, but got invalid token.")
 }
 
 fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>> {
@@ -123,14 +138,14 @@ fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>>
     return node;
 }
 
-fn gen_ident_node(tok: &mut TokenReader) -> Node {
-    let node = Node {
+fn gen_ident_node(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let node = Some(Box::new(Node {
         kind: NodeKind::ND_IDENT,
         l: None,
         r: None,
         val: 0,
         str: String::from(tok.cur_tok().char),
-    };
+    }));
     // MEMO: curを";"にして戻る.
     tok.next();
     return node;
@@ -146,16 +161,27 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
     };
 }
 
+// nary = &num | &ident
+fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
+    if tok.cur_tok().kind == TokenKind::NUM {
+        return gen_num_node(tok);
+    } else if tok.cur_tok().kind == TokenKind::IDENT {
+        return gen_ident_node(tok);
+    } else {
+        panic!("Invalid unary!!!");
+    }
+}
+
 // mul_div = unary ( "*" unary | "/" unary )*
 fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
-    // はじめのtokenがnum nodeと決まりきってるので.
-    let mut node = gen_unary_node(NodeKind::ND_NUM, tok);
+    let mut node = parse_unary(tok);
+    // let mut node = gen_unary_node(NodeKind::ND_NUM, tok);
 
     loop {
         match tok.cur_tok().char.as_str() {
             "*" => {
                 node = Some(Box::new(gen_binary_node(
-                    NodeKind::ND_MUL,
+                    NodeKind::ND_MUL, // TODO: ND_IDENTも対応.
                     node,
                     gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
                 )))
@@ -202,16 +228,9 @@ fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
 }
 
 // generate expression.
-// expr = ( add_sub | ident )
+// expr = add_sub
 fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let mut node: Option<Box<Node>>;
-    if tok.cur_tok().kind == TokenKind::IDENT {
-        // ident
-        node = Some(Box::new(gen_ident_node(tok)));
-    } else {
-        // add_sub
-        node = parse_add_sub(tok);
-    }
+    let mut node = parse_add_sub(tok);
     node = gen_expr(node, tok);
     return node;
 }
@@ -219,7 +238,7 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
 // assing = ident ( "=" expr )*
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     // 左辺のidentをparse.
-    let mut node = Some(Box::new(gen_ident_node(tok)));
+    let mut node = gen_ident_node(tok);
     loop {
         if tok.expect("=") {
             // 右辺のexprをparse.

@@ -41,4 +41,10 @@ test "4; 5;" 5
 test "15* 2+16/  4; 10+3*2-     6;  3 + 4 * 2;" 11
 
 # local val.
-# test "a = 3; a;" 3
+test "a = 3; a;" 3
+test "abf = 123; abf;" 123
+test "a = 22; b = 13; a+b;" 35
+test "A = 2; B = 3; C = 4; D= A+C; E=B+D; E/3;" 3
+test "A = 2; B = 3; C = 4; D= A+C; E=B+D; F=E/3; F;" 3
+# TODO: NOT PASS...
+test "A = 2; B = 3; C = 4; D= A+C; E=B+D; F=E/3; F+A*B;" 9 

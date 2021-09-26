@@ -15,3 +15,4 @@ unary = &num | &ident
 
 ### feature.
 * Basic calculation(+,-,*,/)
+* local val

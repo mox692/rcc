@@ -4,3 +4,5 @@
 .devcontainer
 tmp
 gen
+peda-*
+.gdb*

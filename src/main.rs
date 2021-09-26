@@ -42,7 +42,7 @@ fn main() {
 
     // generate assembly
     // TODO: consider all nodes.
-    codegen(nodes[node_len - 1].as_ref());
+    codegen(nodes.as_ref());
 
     return;
 }

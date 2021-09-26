@@ -12,7 +12,10 @@ pub struct Node {
     pub kind: NodeKind,
     pub l: Option<Box<Node>>,
     pub r: Option<Box<Node>>,
+    // for num node. (should be 0 in other node.)
     pub val: i32,
+    // for ident node. (should be "" in other node.)
+    pub str: String,
 }
 #[derive(Clone)]
 pub enum NodeKind {
@@ -24,6 +27,7 @@ pub enum NodeKind {
     ND_EXPR,
     ND_ASSIGN,
     ND_IDENT,
+    ND_STMT,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -36,6 +40,7 @@ impl NodeKind {
             NodeKind::ND_EXPR => "EXPR",
             NodeKind::ND_IDENT => "IDENT",
             NodeKind::ND_ASSIGN => "ND_ASSIGN",
+            NodeKind::ND_STMT => "ND_STMT",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -61,6 +66,8 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_EXPR => write!(f, "ND_EXPR"),
             NodeKind::ND_IDENT => write!(f, "ND_IDENT"),
             NodeKind::ND_ASSIGN => write!(f, "ND_ASSIGN"),
+            NodeKind::ND_STMT => write!(f, "ND_STMT"),
+
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -82,6 +89,7 @@ fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<N
         l: expr_node,
         r: None,
         val: 0,
+        str: String::from(""),
     }));
     return node;
 }
@@ -94,6 +102,7 @@ fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
             l: None,
             r: None,
             val: tok.cur_tok().value,
+            str: String::from(""),
         }));
         tok.next();
         return node;
@@ -101,13 +110,30 @@ fn gen_num(tok: &mut TokenReader) -> Option<Box<Node>> {
     return None;
 }
 
+fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>> {
+    let node = Some(Box::new(Node {
+        kind: NodeKind::ND_STMT,
+        l: node,
+        r: None,
+        val: 0,
+        str: String::from(""),
+    }));
+    // MEMO: curを";"の次に指す
+    tok.next();
+    return node;
+}
+
 fn gen_ident_node(tok: &mut TokenReader) -> Node {
-    return Node {
+    let node = Node {
         kind: NodeKind::ND_IDENT,
         l: None,
         r: None,
         val: 0,
+        str: String::from(tok.cur_tok().char),
     };
+    // MEMO: curを";"にして戻る.
+    tok.next();
+    return node;
 }
 
 fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -> Node {
@@ -116,6 +142,7 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
         l: l,
         r: r,
         val: 0,
+        str: String::from(""),
     };
 }
 
@@ -175,23 +202,17 @@ fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
 }
 
 // generate expression.
-// expr = ( add_sub | ident ) ";"
+// expr = ( add_sub | ident )
 fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
-    // ident
+    let mut node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IDENT {
-        // TODO: impl
-        let node = Some(Box::new(gen_ident_node(tok)));
-        return node;
-    }
-
-    // add_sub
-    let mut node = parse_add_sub(tok);
-    if tok.expect(";") {
-        node = gen_expr(node, tok)
+        // ident
+        node = Some(Box::new(gen_ident_node(tok)));
     } else {
-        panic!("expect ';', but not found.")
+        // add_sub
+        node = parse_add_sub(tok);
     }
-    tok.next();
+    node = gen_expr(node, tok);
     return node;
 }
 
@@ -199,7 +220,6 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     // 左辺のidentをparse.
     let mut node = Some(Box::new(gen_ident_node(tok)));
-    println!("identnode create.");
     loop {
         if tok.expect("=") {
             // 右辺のexprをparse.
@@ -215,19 +235,24 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// stmt = assign | expr
+// stmt = ( assign | expr ) ";"
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let node: Option<Box<Node>>;
-    // assignなstmtかどうかcheck.
-    // 今の文法だと、この条件であればassignのはず.
+    let mut node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
+        // parse assign
         node = parse_assign(tok);
-        return node;
+    } else {
+        // exprをparse.
+        node = parse_expr(tok);
     }
 
-    // exprをparse.
-    node = parse_expr(tok);
-    return node;
+    // MEMO: ここではcurは";"を指している.
+    if tok.expect(";") {
+        node = gen_stmt(tok, node);
+        // MEMO: ここではcurは";"の次を指している.
+        return node;
+    }
+    panic!("expect ';', but not found.")
 }
 
 // program = stmt*
@@ -270,6 +295,7 @@ pub fn debug_nodes(flag: bool, nodes: &Vec<Box<Node>>) {
         return;
     }
     println!("////////NODE DEBUG START////////");
+    println!("{}'s nodes found.", nodes.len());
     for node in nodes.iter() {
         // 現段階では1つのstatement毎にdepthをresetする.
         let mut depth = 0;
@@ -280,19 +306,26 @@ pub fn debug_nodes(flag: bool, nodes: &Vec<Box<Node>>) {
 
 pub fn read_node(node: &Node, depth: &mut usize) {
     print_node_info(node, depth);
+
+    /*
+        read unary_node.
+    */
     // mainly for ND_NUM.
     if node.l.is_none() && node.r.is_none() {
         return;
     }
 
-    // for ND_EXPR.
-    if node.kind == NodeKind::ND_EXPR {
+    // for ND_EXPR, ND_STMT.
+    if node.kind == NodeKind::ND_EXPR || node.kind == NodeKind::ND_STMT {
         *depth += 1;
         read_node(node.l.as_ref().unwrap(), depth);
         *depth -= 1;
         return;
     }
 
+    /*
+        read binary_node.
+    */
     *depth += 1;
     read_node(node.l.as_ref().unwrap(), depth);
     read_node(node.r.as_ref().unwrap(), depth);
@@ -304,6 +337,9 @@ fn print_node_info(node: &Node, depth: &mut usize) {
     match node.kind {
         NodeKind::ND_NUM => {
             println!("kind: {}, val: {}", node.kind, node.val);
+        }
+        NodeKind::ND_IDENT => {
+            println!("kind: {}, str: {}", node.kind, node.str)
         }
         _ => {
             println!("kind: {}", node.kind);

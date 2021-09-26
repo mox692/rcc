@@ -37,8 +37,8 @@ fn gen(node: &Node, f: &mut File) {
         writeln!(f, "push ${}", node.val);
         return;
     }
-    // exprは展開してやるだけ
-    if node.kind == NodeKind::ND_EXPR {
+    // EXPR, STMTは展開してやるだけ
+    if node.kind == NodeKind::ND_EXPR || node.kind == NodeKind::ND_STMT {
         gen(node.l.as_ref().unwrap().as_ref(), f);
         return;
     }

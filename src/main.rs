@@ -38,10 +38,10 @@ fn main() {
         panic!("Node Not Found!!")
     }
     // debug node.
-    // TODO: update for multiple nodes.(現在は最後尾のNodeしか見てない.)
-    debug_nodes(debug_flag, nodes[node_len - 1].as_ref());
+    debug_nodes(debug_flag, nodes.as_ref());
 
     // generate assembly
+    // TODO: consider all nodes.
     codegen(nodes[node_len - 1].as_ref());
 
     return;

@@ -1,3 +1,8 @@
+/*
+    * tokenの消費はgenXXX()系の関数の引数にtok.next_tok()を渡してtokenを進めるか、
+    genXXX()系の関数内でtokenを進めるようにする.(parseXXX系の中では進めないようにする.)
+*/
+
 use std::usize;
 
 use crate::tokenize::{TokenKind, TokenReader};
@@ -238,28 +243,17 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
         if tok.cur_tok().char == "\0" {
             break;
         }
-        tok.next();
     }
     return nodes;
 }
 
-// generate several nodes, and return last Node.
-// TODO: consider other nodes.
+// generate several nodes, and return Vec<Node>.
 // node = program
 pub fn parse(tok: &mut TokenReader) -> Vec<Box<Node>> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
     let mut node: Vec<Box<Node>> = parse_program(tok);
 
-    // parse_program(tok);
-
-    // expr(;)毎にparseしていき、最後のnodeを評価対象にする.
-    // loop {
-    //     node = parse_expr(tok);
-    //     if tok.expect("\0") {
-    //         break;
-    //     }
-    // }
     return node;
 }
 
@@ -271,13 +265,16 @@ pub fn consume_initial_tok(tok: &mut TokenReader) {
     tok.next();
 }
 
-pub fn debug_nodes(flag: bool, node: &Node) {
+pub fn debug_nodes(flag: bool, nodes: &Vec<Box<Node>>) {
     if !flag {
         return;
     }
     println!("////////NODE DEBUG START////////");
-    let mut depth = 0;
-    read_node(node, &mut depth);
+    for node in nodes.iter() {
+        // 現段階では1つのstatement毎にdepthをresetする.
+        let mut depth = 0;
+        read_node(node, &mut depth);
+    }
     println!("////////NODE DEBUG END////////");
 }
 

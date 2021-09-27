@@ -176,13 +176,20 @@ impl TokenReader {
     pub fn next(&mut self) {
         self.cur += 1;
     }
-    // cur + 1' s token.
+    // expect cur token.
     pub fn expect(&self, s: &str) -> bool {
         if self.tokens[self.cur].char == s {
             true
         } else {
             false
         }
+    }
+    // report unexpected result.
+    pub fn error(&self, message: String) {
+        print!(":::::::::ERROR:::::::::\nmessage: {}\n", message);
+        print_token_info(&self.cur_tok());
+        print!(":::::::::::::::::::::::\n");
+        panic!("");
     }
 }
 
@@ -198,21 +205,23 @@ pub fn debug_tokens(flag: bool, tokens: &Vec<Token>) {
     if !flag {
         return;
     }
-    let mut count = 0;
     println!("////////TOKEN DEBUG START////////");
     for tok in tokens.iter() {
-        match tok.kind {
-            TokenKind::NUM => {
-                println!("index: {}, kind: {}, val: {}", count, tok.kind, tok.value,)
-            }
-            TokenKind::PUNCT | TokenKind::IDENT => {
-                println!("index: {}, kind: {}, char: {}", count, tok.kind, tok.char,)
-            }
-            _ => {
-                println!("index: {}, kind: {}", count, tok.kind,)
-            }
-        }
-        count += 1;
+        print_token_info(tok);
     }
     println!("////////TOKEN DEBUG END////////");
+}
+
+fn print_token_info(tok: &Token) {
+    match tok.kind {
+        TokenKind::NUM => {
+            println!("kind: {}, val: {}", tok.kind, tok.value,)
+        }
+        TokenKind::PUNCT | TokenKind::IDENT => {
+            println!("kind: {}, char: {}", tok.kind, tok.char,)
+        }
+        _ => {
+            println!("kind: {}", tok.kind,)
+        }
+    }
 }

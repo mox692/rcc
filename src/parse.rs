@@ -122,7 +122,11 @@ fn gen_num_node(tok: &mut TokenReader) -> Option<Box<Node>> {
         tok.next();
         return node;
     }
-    panic!("expect num token, but got invalid token.")
+    tok.error(String::from(format!(
+        "expect num token, but got {}.",
+        tok.cur_tok().kind
+    )));
+    panic!();
 }
 
 fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>> {
@@ -151,6 +155,7 @@ fn gen_ident_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
+// num_node or ident_node.
 fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -> Node {
     return Node {
         kind: kind,
@@ -183,14 +188,14 @@ fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_MUL, // TODO: ND_IDENTも対応.
                     node,
-                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                    parse_unary(tok.next_tok()),
                 )))
             }
             "/" => {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_DIV,
                     node,
-                    gen_unary_node(NodeKind::ND_NUM, tok.next_tok()),
+                    parse_unary(tok.next_tok()),
                 )))
             }
             _ => break,

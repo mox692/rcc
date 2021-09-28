@@ -5,7 +5,8 @@ C compiler written in Rust.
 ```
 source = program
 program = stmt*
-stmt = ( assign | expr ) ";"
+stmt = ( assign | return | expr ) ";"
+return = "return" expr
 assign = &ident ( "=" expr )*
 expr = ( add_sub | &ident )
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
@@ -16,3 +17,4 @@ unary = &num | &ident
 ### feature.
 * Basic calculation(+,-,*,/)
 * local val
+* return stmt

@@ -43,7 +43,12 @@ test "15* 2+16/  4; 10+3*2-     6;  3 + 4 * 2;" 11
 # local val.
 test "a = 3; a;" 3
 test "abf = 123; abf;" 123
-test "a = 2; b = 3; a+b;" 5
-test "A = 2; B = 3; C = 4; D= A+C; E=B+D; E/3;" 3
 test "A = 2; B = 3; C = 4; D= A+C; E=B+D; F=E/3; F+A*B;" 9 
 test "a = 2; b = 3; a*b;" 6
+test "a = 2; b = 3; a*b; a+b+b;" 8
+
+# return stmt.
+test "return 3;" 3
+test "return 3; return 4;" 3
+test "aa = 4; return aa + 3;" 7
+test "p = 3; q = 5; return p + q; q * p;" 8

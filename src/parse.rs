@@ -44,6 +44,7 @@ pub enum NodeKind {
     ND_ASSIGN,
     ND_IDENT,
     ND_STMT,
+    ND_RETURN,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -57,6 +58,7 @@ impl NodeKind {
             NodeKind::ND_IDENT => "IDENT",
             NodeKind::ND_ASSIGN => "ND_ASSIGN",
             NodeKind::ND_STMT => "ND_STMT",
+            NodeKind::ND_RETURN => "ND_RETURN",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -83,6 +85,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_IDENT => write!(f, "ND_IDENT"),
             NodeKind::ND_ASSIGN => write!(f, "ND_ASSIGN"),
             NodeKind::ND_STMT => write!(f, "ND_STMT"),
+            NodeKind::ND_RETURN => write!(f, "ND_RETURN"),
 
             _ => {
                 panic!("Invalid Node Kind.")
@@ -152,6 +155,17 @@ fn gen_ident_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     }));
     // MEMO: curを";"にして戻る.
     tok.next();
+    return node;
+}
+
+fn gen_return_node(ret_stmt: Option<Box<Node>>) -> Option<Box<Node>> {
+    let node = Some(Box::new(Node {
+        kind: NodeKind::ND_RETURN,
+        l: ret_stmt,
+        r: None,
+        val: 0,
+        str: String::from(""),
+    }));
     return node;
 }
 
@@ -259,12 +273,21 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// stmt = ( assign | expr ) ";"
+// return ND_RETURN.
+fn parse_return(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let node = gen_return_node(parse_expr(tok.next_tok()));
+    return node;
+}
+
+// stmt = ( assign | "return" expr | expr ) ";"
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
         // parse assign
         node = parse_assign(tok);
+    } else if tok.cur_tok().kind == TokenKind::RETURN {
+        // returnをparse.
+        node = parse_return(tok);
     } else {
         // exprをparse.
         node = parse_expr(tok);
@@ -340,7 +363,10 @@ pub fn read_node(node: &Node, depth: &mut usize) {
     }
 
     // for ND_EXPR, ND_STMT.
-    if node.kind == NodeKind::ND_EXPR || node.kind == NodeKind::ND_STMT {
+    if node.kind == NodeKind::ND_EXPR
+        || node.kind == NodeKind::ND_STMT
+        || node.kind == NodeKind::ND_RETURN
+    {
         *depth += 1;
         read_node(node.l.as_ref().unwrap(), depth);
         *depth -= 1;

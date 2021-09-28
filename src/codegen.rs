@@ -75,6 +75,19 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
         writeln!(f, "push ${}", node.val);
         return;
     }
+    // RETURN.
+    // MEMO: このnodeだけ例外的にepilogueもコードに入れている.
+    if node.kind == NodeKind::ND_RETURN {
+        // evaluate expr.
+        gen(node.l.as_ref().unwrap().as_ref(), f, lv);
+        writeln!(f, "pop %rax");
+        writeln!(f, "mov %rbp, %rsp");
+        writeln!(f, "pop %rbp");
+        // MEMO: 評価はreturn後のexprがされるが、
+        // コンパイラが吐くアセンブリコードは自体はreturn以降のコードも出力される仕様にしている.
+        writeln!(f, "ret");
+        return;
+    }
     // EXPR, STMTは展開してやるだけ.
     if node.kind == NodeKind::ND_EXPR || node.kind == NodeKind::ND_STMT {
         gen(node.l.as_ref().unwrap().as_ref(), f, lv);

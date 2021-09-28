@@ -28,6 +28,7 @@ pub enum TokenKind {
     PUNCT,
     EOF,
     IDENT,
+    RETURN,
 }
 impl TokenKind {
     fn to_string(&self) -> &str {
@@ -37,6 +38,7 @@ impl TokenKind {
             TokenKind::NUM => "NUM",
             TokenKind::PUNCT => "PUNCT",
             TokenKind::IDENT => "IDENT",
+            TokenKind::RETURN => "RETURN",
         }
     }
 }
@@ -48,6 +50,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::NUM => write!(f, "NUM"),
             TokenKind::PUNCT => write!(f, "PUNCT"),
             TokenKind::IDENT => write!(f, "IDENT"),
+            TokenKind::RETURN => write!(f, "RETURN"),
         }
     }
 }
@@ -125,8 +128,9 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             continue;
         }
 
-        // local variable.
+        // local variable or C specific keyword.
         // ひとまずアルファベットで構成された文字列なら許可する.
+        // TODO: local valは2文字目以降は数字·記号も許可する.
         if char.is_ascii_alphabetic() {
             let mut cur_str: String = char.to_string();
             ind += 1;
@@ -139,7 +143,13 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 cur_str.push(char);
                 ind += 1;
             }
-            let tok = Token::new_token(TokenKind::IDENT, 0, cur_str);
+            // specify token kind by cur_str.
+            // TODO: use hashmap
+            let tok_kind: TokenKind = match cur_str.as_str() {
+                "return" => TokenKind::RETURN,
+                _ => TokenKind::IDENT,
+            };
+            let tok = Token::new_token(tok_kind, 0, cur_str);
             tok_vec.push(tok);
             continue;
         }

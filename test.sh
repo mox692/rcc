@@ -53,7 +53,7 @@ test "return 3; return 4;" 3
 test "aa = 4; return aa + 3;" 7
 test "p = 3; q = 5; return p + q; q * p;" 8
 
-# equalities
+# equalities.
 test "3 == 3;" 1
 test "2 == 0;" 0
 test "a = 3; b = 1; a != b;" 1
@@ -65,3 +65,9 @@ test "4 > 5;" 0
 test "4 >= 3;" 1
 test "5 <= 5;" 1
 test "a = 5 <= 5; b = 4; a + b;" 5
+
+# if statement.
+test "if (2 < 5) 34;" 34
+test "if (3 > 2) a = 2; a;" 2
+test "a = 3; b = 2; if (a * b > a + b) return 3; c = 32; return c + c;" 3
+test "a = 3; b = 2; if (a * b < a + b) return 3; c = 32; if (c < b * a) return c + b; d = 22; d + c;" 54

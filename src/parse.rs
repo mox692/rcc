@@ -51,6 +51,7 @@ pub enum NodeKind {
     ND_BE,
     ND_LT,
     ND_LE,
+    ND_IF,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -71,6 +72,7 @@ impl NodeKind {
             NodeKind::ND_BE => "ND_BE",
             NodeKind::ND_LT => "ND_LT",
             NodeKind::ND_LE => "ND_LE",
+            NodeKind::ND_IF => "ND_IF",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -104,6 +106,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_BE => write!(f, "ND_BE"),
             NodeKind::ND_LT => write!(f, "ND_LT"),
             NodeKind::ND_LE => write!(f, "ND_LE"),
+            NodeKind::ND_IF => write!(f, "ND_IF"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -212,6 +215,17 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
     };
 }
 
+// gen if node.
+fn gen_ifstmt_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> {
+    return Some(Box::new(Node {
+        kind: NodeKind::ND_IF,
+        l: l,
+        r: r,
+        val: 0,
+        str: String::from(""),
+    }));
+}
+
 // nary = &num | &ident
 fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().kind == TokenKind::NUM {
@@ -306,6 +320,24 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
+// ifstmt = "if" "(" equality ")" stmt
+fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node: Option<Box<Node>>;
+    if tok.cur_tok().char == "(" {
+        node = parse_equality(tok.next_tok());
+    } else {
+        tok.error(String::from("parse if err."));
+        panic!();
+    }
+    if tok.cur_tok().char == ")" {
+        node = gen_ifstmt_node(node, parse_stmt(tok.next_tok()));
+    } else {
+        tok.error(String::from("parse if err."));
+        panic!();
+    }
+    return node;
+}
+
 // return = "return" equality
 fn parse_return(tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = gen_return_node(parse_equality(tok.next_tok()));
@@ -334,19 +366,19 @@ fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// stmt = ( assign | return | equality ) ";"
+// stmt = ( assign | return | equality | ifstmt ) ";"
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
-        // parse assign
         node = parse_assign(tok);
     } else if tok.cur_tok().kind == TokenKind::RETURN {
-        // returnをparse.
         node = parse_return(tok);
+    } else if tok.cur_tok().kind == TokenKind::IF {
+        node = parse_ifstmt(tok.next_tok());
+        // MEMO: ifは末尾に";"が来るのでここでreturn.
+        return node;
     } else {
-        // parse equality.
         node = parse_equality(tok);
-        // node = parse_expr(tok);
     }
 
     // MEMO: ここではcurは";"を指している.

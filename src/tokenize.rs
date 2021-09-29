@@ -36,6 +36,7 @@ pub enum TokenKind {
     LT, // <
     BE, // >=
     BT, // >
+    IF,
 }
 
 impl TokenKind {
@@ -53,6 +54,7 @@ impl TokenKind {
             TokenKind::LE => "LE",
             TokenKind::BT => "BT",
             TokenKind::BE => "BE",
+            TokenKind::IF => "IF",
         }
     }
 }
@@ -72,6 +74,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::LE => write!(f, "LE"),
             TokenKind::BT => write!(f, "BT"),
             TokenKind::BE => write!(f, "BE"),
+            TokenKind::IF => write!(f, "IF"),
         }
     }
 }
@@ -158,6 +161,8 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
                 '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
                 ';' => Token::new_token(TokenKind::PUNCT, 0, String::from(";")),
+                '(' => Token::new_token(TokenKind::PUNCT, 0, String::from("(")),
+                ')' => Token::new_token(TokenKind::PUNCT, 0, String::from(")")),
                 // TODO: もう少しきれいに.
                 '=' => call_eq(string, &mut ind),
                 '!' => call_neq(string, &mut ind),
@@ -214,6 +219,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             // TODO: use hashmap
             let tok_kind: TokenKind = match cur_str.as_str() {
                 "return" => TokenKind::RETURN,
+                "if" => TokenKind::IF,
                 _ => TokenKind::IDENT,
             };
             let tok = Token::new_token(tok_kind, 0, cur_str);

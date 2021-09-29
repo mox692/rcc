@@ -5,8 +5,9 @@ C compiler written in Rust.
 ```
 source = program
 program = stmt*
-stmt = ( assign | return | equality ) ";"
+stmt = ( assign | return | equality | ifstmt ) ";"
 return = "return" equality
+ifstmt = "if" "(" equality ")" stmt 
 equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )*
 assign = &ident ( "=" equality )*
 expr = ( add_sub | &ident )
@@ -17,5 +18,7 @@ unary = &num | &ident
 
 ### feature.
 * Basic calculation(+,-,*,/)
-* local val
-* return stmt
+* equalities( ==, !=, <, <=, >, >= )
+* local val.
+* return stmt.
+* if statement.

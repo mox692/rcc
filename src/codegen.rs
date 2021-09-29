@@ -42,8 +42,24 @@ impl LocalVariable {
     }
 }
 
+struct CodeLabel {
+    cur_index: usize,
+}
+impl CodeLabel {
+    fn new() -> Self {
+        return CodeLabel { cur_index: 0 };
+    }
+    fn cur_label_index(&self) -> usize {
+        return self.cur_index;
+    }
+    fn increment(&mut self) {
+        self.cur_index += 1;
+    }
+}
+
 pub fn codegen(nodes: &Vec<Box<Node>>) {
     let mut lv = LocalVariable::new();
+    let mut cl = CodeLabel::new();
     let mut f = create_file("./gen.s");
     // put start up.
     writeln!(f, ".text");
@@ -57,7 +73,7 @@ pub fn codegen(nodes: &Vec<Box<Node>>) {
 
     // 各stmt毎にcodegen.
     for node in nodes {
-        gen(node, &mut f, &mut lv);
+        gen(node, &mut f, &mut lv, &mut cl);
     }
 
     writeln!(f, "pop %rax");
@@ -67,7 +83,7 @@ pub fn codegen(nodes: &Vec<Box<Node>>) {
 }
 
 // 引数で渡されたNodeを展開して、その評価結果をstack topにpushする.
-fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
+fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
     /*
         gen from unary node.
     */
@@ -75,11 +91,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
         writeln!(f, "push ${}", node.val);
         return;
     }
-    // RETURN.
     // MEMO: このnodeだけ例外的にepilogueもコードに入れている.
     if node.kind == NodeKind::ND_RETURN {
         // evaluate expr.
-        gen(node.l.as_ref().unwrap().as_ref(), f, lv);
+        gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
         writeln!(f, "pop %rax");
         writeln!(f, "mov %rbp, %rsp");
         writeln!(f, "pop %rbp");
@@ -88,15 +103,14 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
         writeln!(f, "ret");
         return;
     }
-    // EXPR, STMTは展開してやるだけ.
     if node.kind == NodeKind::ND_EXPR || node.kind == NodeKind::ND_STMT {
-        gen(node.l.as_ref().unwrap().as_ref(), f, lv);
+        gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
         return;
     }
     if node.kind == NodeKind::ND_IDENT {
         // node.strに対応するmemoryからデータを取ってきて、stackにpushする.
         writeln!(f, "lea -{}(%rbp), %rax", lv.get_offset(node.str.clone()));
-        //       TODO: get_addrに(変数が見つからなかった際の)errハンドリングもやらせる
+        // TODO: get_addrに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
         writeln!(f, "push %rax");
         return;
@@ -118,17 +132,27 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
         );
         writeln!(f, "push %rax");
 
-        // 右辺の値をstackに積む.
-        gen(node.r.as_ref().unwrap().as_ref(), f, lv);
-        writeln!(f, "pop %rax"); // 右辺値(val)
-        writeln!(f, "pop %rdi"); // 左辺値(addr)
+        gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
+        writeln!(f, "pop %rax");
+        writeln!(f, "pop %rdi");
         writeln!(f, "mov %rax, (%rdi)");
-
+        return;
+    }
+    if node.kind == NodeKind::ND_IF {
+        cl.cur_index += 1;
+        gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
+        writeln!(f, "pop %rax");
+        writeln!(f, "mov $1, %rdi");
+        writeln!(f, "cmp %rdi, %rax");
+        writeln!(f, "jne .L{}", cl.cur_label_index());
+        gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
+        writeln!(f, ".L{}:", cl.cur_label_index());
         return;
     }
 
-    gen(node.l.as_ref().unwrap().as_ref(), f, lv);
-    gen(node.r.as_ref().unwrap().as_ref(), f, lv);
+    // other binary operation.
+    gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
+    gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
 
     writeln!(f, "pop %rdi"); // right side.
     writeln!(f, "pop %rax"); // left side.

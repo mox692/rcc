@@ -52,3 +52,9 @@ test "return 3;" 3
 test "return 3; return 4;" 3
 test "aa = 4; return aa + 3;" 7
 test "p = 3; q = 5; return p + q; q * p;" 8
+
+# equalities
+test "3 == 3;" 1
+test "2 == 0;" 0
+test "a = 3; b = 1; a != b;" 1
+test "a = 3; b = 1; return a != b; return a;" 1

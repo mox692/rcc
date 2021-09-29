@@ -133,6 +133,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
     writeln!(f, "pop %rdi"); // right side.
     writeln!(f, "pop %rax"); // left side.
 
+    // 四則演算.
     match node.kind {
         NodeKind::ND_ADD => {
             writeln!(f, "add %rdi, %rax");
@@ -147,10 +148,20 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
             writeln!(f, "cqo");
             writeln!(f, "idiv %rdi");
         }
-        _ => {
-            panic!("Unsapported node kind found");
+        // 比較演算.
+        NodeKind::ND_EQ => {
+            writeln!(f, "cmp %rdi, %rax");
+            writeln!(f, "sete %al");
+            writeln!(f, "movzb %al, %rax");
         }
+        NodeKind::ND_NEQ => {
+            writeln!(f, "cmp %rdi, %rax");
+            writeln!(f, "setne %al");
+            writeln!(f, "movzb %al, %rax");
+        }
+        _ => {}
     }
+
     writeln!(f, "push %rax");
 }
 

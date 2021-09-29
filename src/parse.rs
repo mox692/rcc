@@ -45,6 +45,8 @@ pub enum NodeKind {
     ND_IDENT,
     ND_STMT,
     ND_RETURN,
+    ND_EQ,
+    ND_NEQ,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -59,6 +61,8 @@ impl NodeKind {
             NodeKind::ND_ASSIGN => "ND_ASSIGN",
             NodeKind::ND_STMT => "ND_STMT",
             NodeKind::ND_RETURN => "ND_RETURN",
+            NodeKind::ND_EQ => "ND_EQ",
+            NodeKind::ND_NEQ => "ND_NEQ",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -86,7 +90,8 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_ASSIGN => write!(f, "ND_ASSIGN"),
             NodeKind::ND_STMT => write!(f, "ND_STMT"),
             NodeKind::ND_RETURN => write!(f, "ND_RETURN"),
-
+            NodeKind::ND_EQ => write!(f, "ND_EQ"),
+            NodeKind::ND_NEQ => write!(f, "ND_NEQ"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -158,6 +163,21 @@ fn gen_ident_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
+fn gen_equality_node(
+    nodekind: NodeKind,
+    l: Option<Box<Node>>,
+    r: Option<Box<Node>>,
+) -> Option<Box<Node>> {
+    let node = Some(Box::new(Node {
+        kind: nodekind,
+        l: l,
+        r: r,
+        val: 0,
+        str: String::from(""),
+    }));
+    return node;
+}
+
 fn gen_return_node(ret_stmt: Option<Box<Node>>) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_RETURN,
@@ -187,7 +207,8 @@ fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
     } else if tok.cur_tok().kind == TokenKind::IDENT {
         return gen_ident_node(tok);
     } else {
-        panic!("Invalid unary!!!");
+        tok.error(String::from("unexpected unary."));
+        panic!("");
     }
 }
 
@@ -273,13 +294,27 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// return ND_RETURN.
+// return = "return" equality
 fn parse_return(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let node = gen_return_node(parse_expr(tok.next_tok()));
+    let node = gen_return_node(parse_equality(tok.next_tok()));
     return node;
 }
 
-// stmt = ( assign | "return" expr | expr ) ";"
+// equality = expr ( "==" expr | "!=" expr )*
+fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node = parse_expr(tok);
+    if tok.cur_tok().kind == TokenKind::EQ {
+        // TODO: nth_next的なものに置き換えたい.
+        node = gen_equality_node(NodeKind::ND_EQ, node, parse_expr(tok.next_tok()));
+    } else if tok.cur_tok().kind == TokenKind::NEQ {
+        node = gen_equality_node(NodeKind::ND_NEQ, node, parse_expr(tok.next_tok()));
+    }
+    // MEMO: codegenの都合で、 ==, != を含まないexprは、equalityでwrapしないで、
+    //       そのままexpr nodeとして返す.
+    return node;
+}
+
+// stmt = ( assign | return | equality ) ";"
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
@@ -289,8 +324,9 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         // returnをparse.
         node = parse_return(tok);
     } else {
-        // exprをparse.
-        node = parse_expr(tok);
+        // parse equality.
+        node = parse_equality(tok);
+        // node = parse_expr(tok);
     }
 
     // MEMO: ここではcurは";"を指している.
@@ -299,7 +335,9 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         // MEMO: ここではcurは";"の次を指している.
         return node;
     }
-    panic!("expect ';', but not found.")
+
+    tok.error(String::from("expect ';', but not found."));
+    panic!("");
 }
 
 // program = stmt*

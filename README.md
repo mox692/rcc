@@ -5,8 +5,9 @@ C compiler written in Rust.
 ```
 source = program
 program = stmt*
-stmt = ( assign | return | expr ) ";"
-return = "return" expr
+stmt = ( assign | return | equality ) ";"
+return = "return" equality
+equality = expr ( "==" expr | "!=" expr )*
 assign = &ident ( "=" expr )*
 expr = ( add_sub | &ident )
 add_sub = mul_div( "+" mul_div | "-" mul_div )*

@@ -28,7 +28,9 @@ pub enum TokenKind {
     PUNCT,
     EOF,
     IDENT,
-    RETURN,
+    RETURN, // return
+    EQ,     // ==
+    NEQ,    // !=
 }
 impl TokenKind {
     fn to_string(&self) -> &str {
@@ -39,6 +41,8 @@ impl TokenKind {
             TokenKind::PUNCT => "PUNCT",
             TokenKind::IDENT => "IDENT",
             TokenKind::RETURN => "RETURN",
+            TokenKind::EQ => "EQ",
+            TokenKind::NEQ => "NEQ",
         }
     }
 }
@@ -51,6 +55,8 @@ impl std::fmt::Display for TokenKind {
             TokenKind::PUNCT => write!(f, "PUNCT"),
             TokenKind::IDENT => write!(f, "IDENT"),
             TokenKind::RETURN => write!(f, "RETURN"),
+            TokenKind::EQ => write!(f, "EQ"),
+            TokenKind::NEQ => write!(f, "NEQ"),
         }
     }
 }
@@ -61,6 +67,29 @@ impl PartialEq for TokenKind {
     }
 }
 impl Eq for TokenKind {}
+
+fn call_eq(string: &String, ind: &mut usize) -> Token {
+    let next_char = string.chars().nth(*ind + 1).unwrap();
+    let tok: Token;
+    if next_char.eq(&'=') {
+        tok = Token::new_token(TokenKind::EQ, 0, String::from("=="));
+        // 2つ目の=を指すようになる.
+        *ind += 1;
+    } else {
+        tok = Token::new_token(TokenKind::PUNCT, 0, String::from("="));
+    }
+    return tok;
+}
+
+fn call_neq(string: &String, ind: &mut usize) -> Token {
+    let next_char = string.chars().nth(*ind + 1).unwrap();
+    if next_char.eq(&'=') {
+        *ind += 1;
+        return Token::new_token(TokenKind::NEQ, 0, String::from("!="));
+    }
+    println!("expect '=', but got {}", next_char);
+    panic!()
+}
 
 pub fn tokenize(string: &String) -> Vec<Token> {
     let mut ind = 0;
@@ -95,7 +124,9 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
                 '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
                 ';' => Token::new_token(TokenKind::PUNCT, 0, String::from(";")),
-                '=' => Token::new_token(TokenKind::PUNCT, 0, String::from("=")),
+                // TODO: もう少しきれいに.
+                '=' => call_eq(string, &mut ind),
+                '!' => call_neq(string, &mut ind),
                 _ => {
                     panic!("Unknown token.");
                 }
@@ -181,6 +212,10 @@ impl TokenReader {
     }
     pub fn get_next_tok(&self) -> Token {
         return self.tokens[self.cur + 1 as usize].clone();
+    }
+    // TODO: 上の関数と合わせて、見直す.
+    pub fn get_next_nth_tok(&self, offset: usize) -> Token {
+        return self.tokens[self.cur + offset as usize].clone();
     }
     // next counts up current position.
     pub fn next(&mut self) {

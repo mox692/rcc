@@ -133,8 +133,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
     writeln!(f, "pop %rdi"); // right side.
     writeln!(f, "pop %rax"); // left side.
 
-    // 四則演算.
     match node.kind {
+        // 四則演算.
         NodeKind::ND_ADD => {
             writeln!(f, "add %rdi, %rax");
         }
@@ -157,6 +157,26 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable) {
         NodeKind::ND_NEQ => {
             writeln!(f, "cmp %rdi, %rax");
             writeln!(f, "setne %al");
+            writeln!(f, "movzb %al, %rax");
+        }
+        NodeKind::ND_LE => {
+            writeln!(f, "cmp %rdi, %rax");
+            writeln!(f, "setle %al");
+            writeln!(f, "movzb %al, %rax");
+        }
+        NodeKind::ND_LT => {
+            writeln!(f, "cmp %rdi, %rax");
+            writeln!(f, "setl %al");
+            writeln!(f, "movzb %al, %rax");
+        }
+        NodeKind::ND_BE => {
+            writeln!(f, "cmp %rax, %rdi");
+            writeln!(f, "setle %al");
+            writeln!(f, "movzb %al, %rax");
+        }
+        NodeKind::ND_BT => {
+            writeln!(f, "cmp %rax, %rdi");
+            writeln!(f, "setl %al");
             writeln!(f, "movzb %al, %rax");
         }
         _ => {}

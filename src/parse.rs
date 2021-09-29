@@ -47,6 +47,10 @@ pub enum NodeKind {
     ND_RETURN,
     ND_EQ,
     ND_NEQ,
+    ND_BT,
+    ND_BE,
+    ND_LT,
+    ND_LE,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -63,6 +67,10 @@ impl NodeKind {
             NodeKind::ND_RETURN => "ND_RETURN",
             NodeKind::ND_EQ => "ND_EQ",
             NodeKind::ND_NEQ => "ND_NEQ",
+            NodeKind::ND_BT => "ND_BT",
+            NodeKind::ND_BE => "ND_BE",
+            NodeKind::ND_LT => "ND_LT",
+            NodeKind::ND_LE => "ND_LE",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -92,6 +100,10 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_RETURN => write!(f, "ND_RETURN"),
             NodeKind::ND_EQ => write!(f, "ND_EQ"),
             NodeKind::ND_NEQ => write!(f, "ND_NEQ"),
+            NodeKind::ND_BT => write!(f, "ND_BT"),
+            NodeKind::ND_BE => write!(f, "ND_BE"),
+            NodeKind::ND_LT => write!(f, "ND_LT"),
+            NodeKind::ND_LE => write!(f, "ND_LE"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -275,7 +287,7 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// assing = ident ( "=" expr )*
+// assign = &ident ( "=" equality )*
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     // 左辺のidentをparse.
     let mut node = gen_ident_node(tok);
@@ -285,7 +297,7 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
             node = Some(Box::new(gen_binary_node(
                 NodeKind::ND_ASSIGN,
                 node,
-                parse_expr(tok.next_tok()),
+                parse_equality(tok.next_tok()),
             )));
         } else {
             break;
@@ -300,7 +312,7 @@ fn parse_return(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// equality = expr ( "==" expr | "!=" expr )*
+// equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )*
 fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = parse_expr(tok);
     if tok.cur_tok().kind == TokenKind::EQ {
@@ -308,6 +320,14 @@ fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
         node = gen_equality_node(NodeKind::ND_EQ, node, parse_expr(tok.next_tok()));
     } else if tok.cur_tok().kind == TokenKind::NEQ {
         node = gen_equality_node(NodeKind::ND_NEQ, node, parse_expr(tok.next_tok()));
+    } else if tok.cur_tok().kind == TokenKind::BE {
+        node = gen_equality_node(NodeKind::ND_BE, node, parse_expr(tok.next_tok()));
+    } else if tok.cur_tok().kind == TokenKind::BT {
+        node = gen_equality_node(NodeKind::ND_BT, node, parse_expr(tok.next_tok()));
+    } else if tok.cur_tok().kind == TokenKind::LT {
+        node = gen_equality_node(NodeKind::ND_LT, node, parse_expr(tok.next_tok()));
+    } else if tok.cur_tok().kind == TokenKind::LE {
+        node = gen_equality_node(NodeKind::ND_LE, node, parse_expr(tok.next_tok()));
     }
     // MEMO: codegenの都合で、 ==, != を含まないexprは、equalityでwrapしないで、
     //       そのままexpr nodeとして返す.

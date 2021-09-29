@@ -58,3 +58,10 @@ test "3 == 3;" 1
 test "2 == 0;" 0
 test "a = 3; b = 1; a != b;" 1
 test "a = 3; b = 1; return a != b; return a;" 1
+test "4 < 5;" 1
+test "4 < 2;" 0
+test "4 > 2;" 1
+test "4 > 5;" 0
+test "4 >= 3;" 1
+test "5 <= 5;" 1
+test "a = 5 <= 5; b = 4; a + b;" 5

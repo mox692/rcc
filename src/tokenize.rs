@@ -31,7 +31,13 @@ pub enum TokenKind {
     RETURN, // return
     EQ,     // ==
     NEQ,    // !=
+    // 命名は、「(右辺と比較した際に)左辺は」
+    LE, // <=
+    LT, // <
+    BE, // >=
+    BT, // >
 }
+
 impl TokenKind {
     fn to_string(&self) -> &str {
         match self {
@@ -43,9 +49,14 @@ impl TokenKind {
             TokenKind::RETURN => "RETURN",
             TokenKind::EQ => "EQ",
             TokenKind::NEQ => "NEQ",
+            TokenKind::LT => "LT",
+            TokenKind::LE => "LE",
+            TokenKind::BT => "BT",
+            TokenKind::BE => "BE",
         }
     }
 }
+
 impl std::fmt::Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
@@ -57,6 +68,10 @@ impl std::fmt::Display for TokenKind {
             TokenKind::RETURN => write!(f, "RETURN"),
             TokenKind::EQ => write!(f, "EQ"),
             TokenKind::NEQ => write!(f, "NEQ"),
+            TokenKind::LT => write!(f, "LT"),
+            TokenKind::LE => write!(f, "LE"),
+            TokenKind::BT => write!(f, "BT"),
+            TokenKind::BE => write!(f, "BE"),
         }
     }
 }
@@ -89,6 +104,25 @@ fn call_neq(string: &String, ind: &mut usize) -> Token {
     }
     println!("expect '=', but got {}", next_char);
     panic!()
+}
+
+// >
+fn call_big(string: &String, ind: &mut usize) -> Token {
+    let next_char = string.chars().nth(*ind + 1).unwrap();
+    if next_char.eq(&'=') {
+        *ind += 1;
+        return Token::new_token(TokenKind::BE, 0, String::from(">="));
+    }
+    return Token::new_token(TokenKind::BT, 0, String::from(">"));
+}
+
+fn call_less(string: &String, ind: &mut usize) -> Token {
+    let next_char = string.chars().nth(*ind + 1).unwrap();
+    if next_char.eq(&'=') {
+        *ind += 1;
+        return Token::new_token(TokenKind::LE, 0, String::from("<="));
+    }
+    return Token::new_token(TokenKind::LT, 0, String::from("<"));
 }
 
 pub fn tokenize(string: &String) -> Vec<Token> {
@@ -127,6 +161,8 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 // TODO: もう少しきれいに.
                 '=' => call_eq(string, &mut ind),
                 '!' => call_neq(string, &mut ind),
+                '>' => call_big(string, &mut ind),
+                '<' => call_less(string, &mut ind),
                 _ => {
                     panic!("Unknown token.");
                 }

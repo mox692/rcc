@@ -32,6 +32,25 @@ pub struct Node {
     pub val: i32,
     // for ident node. (should be "" in other node.)
     pub str: String,
+
+    // for if stmt
+    pub if_cond: Option<Box<Node>>,
+    pub if_stmts: Option<Box<Node>>,
+}
+// if ( A ) { B; } else if( C ) { D; } else { E }
+impl Default for Node {
+    fn default() -> Self {
+        return Node {
+            // `kind` must be override.
+            kind: NodeKind::ND_NUM,
+            l: None,
+            r: None,
+            val: 0,
+            str: String::new(),
+            if_cond: None,
+            if_stmts: None,
+        };
+    }
 }
 #[derive(Clone)]
 pub enum NodeKind {
@@ -51,7 +70,10 @@ pub enum NodeKind {
     ND_BE,
     ND_LT,
     ND_LE,
+    // `if`, `else if`
     ND_IF,
+    // `else`
+    ND_ELSE,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -126,9 +148,7 @@ fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<N
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_EXPR,
         l: expr_node,
-        r: None,
-        val: 0,
-        str: String::from(""),
+        ..Default::default()
     }));
     return node;
 }
@@ -137,10 +157,8 @@ fn gen_num_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().kind.eq(&TokenKind::NUM) {
         let node = Some(Box::new(Node {
             kind: NodeKind::ND_NUM,
-            l: None,
-            r: None,
             val: tok.cur_tok().value,
-            str: String::from(""),
+            ..Default::default()
         }));
         tok.next();
         return node;
@@ -156,9 +174,7 @@ fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>>
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_STMT,
         l: node,
-        r: None,
-        val: 0,
-        str: String::from(""),
+        ..Default::default()
     }));
     // MEMO: curを";"の次に指す
     tok.next();
@@ -168,10 +184,8 @@ fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>>
 fn gen_ident_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_IDENT,
-        l: None,
-        r: None,
-        val: 0,
         str: String::from(tok.cur_tok().char),
+        ..Default::default()
     }));
     // MEMO: curを";"にして戻る.
     tok.next();
@@ -187,8 +201,7 @@ fn gen_equality_node(
         kind: nodekind,
         l: l,
         r: r,
-        val: 0,
-        str: String::from(""),
+        ..Default::default()
     }));
     return node;
 }
@@ -197,9 +210,7 @@ fn gen_return_node(ret_stmt: Option<Box<Node>>) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_RETURN,
         l: ret_stmt,
-        r: None,
-        val: 0,
-        str: String::from(""),
+        ..Default::default()
     }));
     return node;
 }
@@ -210,8 +221,7 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
         kind: kind,
         l: l,
         r: r,
-        val: 0,
-        str: String::from(""),
+        ..Default::default()
     };
 }
 
@@ -221,8 +231,7 @@ fn gen_ifstmt_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Nod
         kind: NodeKind::ND_IF,
         l: l,
         r: r,
-        val: 0,
-        str: String::from(""),
+        ..Default::default()
     }));
 }
 
@@ -320,7 +329,35 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// ifstmt = "if" "(" equality ")" stmt
+//  ifstmt = "if" "(" equality ")" stmt ( "else" stmt )?
+//
+//  Parse if statements to Node type data structure.
+//  The root-if-node also includes nodes such as else-if node,
+//  else node that follow the if statement.
+//  We assign first `if` token, next if condition expression (equality),
+//  executed statement, to root-if-node's left side node.
+//
+//  If `else` or `else-if` continues, root-if-node's right side is used,
+//  and if not, Node.r will be None.
+//  Since there may be multiple else ifs, in that case, as mentioned above,
+//  place the condition and execution statement on the left,
+//  and the else-if node that follows on the right.
+//
+//  if ( A ) B; else if ( C ) D; else E;
+//
+//  Node                ND_IF
+//      Node.l          ND_IFBLK
+//          Node.l      A (equality)
+//          Node.r      B (stmt)
+//      Node.r          ND_ELIF_BLK
+//          Node.l
+//              Node.l  C (equality)
+//              Node.r  D (stmt)
+//          Node.r      ND_ELSE_BLK
+//              Node.l  E (stmt)
+//              Node.r  None
+//
+
 fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().char == "(" {

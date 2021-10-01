@@ -4,11 +4,12 @@ C compiler written in Rust.
 ·EBNF like expression
 ```
 source = program
-program = stmt*
-stmt = ( assign | return | equality | ifstmt ) ";"
+program = stmts*
+stmts = ( stmt | ifstmt )
+ifstmt = "if" "(" equality ")" stmt* ( "else if" "(" equality ")" stmt* )* ( "else" stmt* )?
+stmt = ( assign | return | equality ) ";"
 return = "return" equality
-ifstmt = "if" "(" equality ")" stmt 
-equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )*
+equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?
 assign = &ident ( "=" equality )*
 expr = ( add_sub | &ident )
 add_sub = mul_div( "+" mul_div | "-" mul_div )*

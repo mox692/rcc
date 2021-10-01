@@ -6,7 +6,7 @@ C compiler written in Rust.
 source = program
 program = stmts*
 stmts = ( stmt | ifstmt )
-ifstmt = "if" "(" equality ")" stmt* ( "else if" "(" equality ")" stmt* )* ( "else" stmt* )?
+ifstmt = "if" "(" equality ")" stmts ( "else if" "(" equality ")" stmts ) ( "else" stmts )?
 stmt = ( assign | return | equality ) ";"
 return = "return" equality
 equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?

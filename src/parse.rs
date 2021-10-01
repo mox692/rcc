@@ -19,8 +19,6 @@
     ·exprには即値と変数が混在しうる.有効な変数かどうかの判定は別途行う.
 */
 
-use std::usize;
-
 use crate::tokenize::{TokenKind, TokenReader};
 
 #[derive(Clone)]
@@ -329,35 +327,7 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-//  ifstmt = "if" "(" equality ")" stmt ( "else" stmt )?
-//
-//  Parse if statements to Node type data structure.
-//  The root-if-node also includes nodes such as else-if node,
-//  else node that follow the if statement.
-//  We assign first `if` token, next if condition expression (equality),
-//  executed statement, to root-if-node's left side node.
-//
-//  If `else` or `else-if` continues, root-if-node's right side is used,
-//  and if not, Node.r will be None.
-//  Since there may be multiple else ifs, in that case, as mentioned above,
-//  place the condition and execution statement on the left,
-//  and the else-if node that follows on the right.
-//
-//  if ( A ) B; else if ( C ) D; else E;
-//
-//  Node                ND_IF
-//      Node.l          ND_IFBLK
-//          Node.l      A (equality)
-//          Node.r      B (stmt)
-//      Node.r          ND_ELIF_BLK
-//          Node.l
-//              Node.l  C (equality)
-//              Node.r  D (stmt)
-//          Node.r      ND_ELSE_BLK
-//              Node.l  E (stmt)
-//              Node.r  None
-//
-
+// ifstmt = "if" "(" equality ")" stmts ( "else if" "(" equality ")" stmts )* ( "else" stmts )?
 fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().char == "(" {
@@ -429,7 +399,18 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     panic!("");
 }
 
-// program = stmt*
+// stmts = ( stmt | ifstmt )
+fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let node: Option<Box<Node>>;
+    if tok.cur_tok().kind == TokenKind::IF {
+        node = parse_ifstmt(tok.next_tok());
+        return node;
+    }
+    node = parse_stmt(tok);
+    return node;
+}
+
+// program = stmts*
 fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
     let mut nodes: Vec<Box<Node>> = Vec::new();
     loop {
@@ -437,7 +418,7 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
         if tok.cur_tok().char == "\0" {
             break;
         }
-        let node = parse_stmt(tok);
+        let node = parse_stmts(tok);
         nodes.push(node.unwrap());
         if tok.cur_tok().char == "\0" {
             break;

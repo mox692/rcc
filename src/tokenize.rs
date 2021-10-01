@@ -37,6 +37,7 @@ pub enum TokenKind {
     BE, // >=
     BT, // >
     IF,
+    ELIF,
     ELSE,
 }
 
@@ -56,6 +57,7 @@ impl TokenKind {
             TokenKind::BT => "BT",
             TokenKind::BE => "BE",
             TokenKind::IF => "IF",
+            TokenKind::ELIF => "ELIF",
             TokenKind::ELSE => "ELSE",
         }
     }
@@ -77,6 +79,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::BT => write!(f, "BT"),
             TokenKind::BE => write!(f, "BE"),
             TokenKind::IF => write!(f, "IF"),
+            TokenKind::ELIF => write!(f, "ELIF"),
             TokenKind::ELSE => write!(f, "ELSE"),
         }
     }

@@ -37,6 +37,7 @@ pub enum TokenKind {
     BE, // >=
     BT, // >
     IF,
+    ELSE,
 }
 
 impl TokenKind {
@@ -55,6 +56,7 @@ impl TokenKind {
             TokenKind::BT => "BT",
             TokenKind::BE => "BE",
             TokenKind::IF => "IF",
+            TokenKind::ELSE => "ELSE",
         }
     }
 }
@@ -75,6 +77,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::BT => write!(f, "BT"),
             TokenKind::BE => write!(f, "BE"),
             TokenKind::IF => write!(f, "IF"),
+            TokenKind::ELSE => write!(f, "ELSE"),
         }
     }
 }
@@ -220,6 +223,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             let tok_kind: TokenKind = match cur_str.as_str() {
                 "return" => TokenKind::RETURN,
                 "if" => TokenKind::IF,
+                "else" => TokenKind::ELSE,
                 _ => TokenKind::IDENT,
             };
             let tok = Token::new_token(tok_kind, 0, cur_str);

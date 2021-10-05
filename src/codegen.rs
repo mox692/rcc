@@ -138,15 +138,47 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         writeln!(f, "mov %rax, (%rdi)");
         return;
     }
-    if node.kind == NodeKind::ND_IF {
+    if node.kind == NodeKind::ND_IFSTMT {
         cl.cur_index += 1;
-        gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
+        let if_node = node.if_node.as_ref().unwrap();
+        let elsif_node = node.elsif_node.as_ref();
+        let else_node = node.else_node.as_ref();
+
+        // call if
+        gen(if_node, f, lv, cl);
+
+        if !elsif_node.is_none() {
+            writeln!(f, ".L{}:", cl.cur_label_index());
+            cl.cur_index += 1;
+            gen(elsif_node.unwrap(), f, lv, cl);
+        }
+
+        if !else_node.is_none() {
+            writeln!(f, ".L{}:", cl.cur_label_index());
+            cl.cur_index += 1;
+            gen(else_node.unwrap(), f, lv, cl);
+        }
+
+        writeln!(f, ".L{}:", cl.cur_label_index());
+
+        return;
+    }
+    if node.kind == NodeKind::ND_IF || node.kind == NodeKind::ND_ELSIF {
+        gen(node.l.as_ref().unwrap(), f, lv, cl);
         writeln!(f, "pop %rax");
         writeln!(f, "mov $1, %rdi");
         writeln!(f, "cmp %rdi, %rax");
         writeln!(f, "jne .L{}", cl.cur_label_index());
-        gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
-        writeln!(f, ".L{}:", cl.cur_label_index());
+        // stmt
+        gen(node.r.as_ref().unwrap(), f, lv, cl);
+        return;
+    }
+    if node.kind == NodeKind::ND_ELSE {
+        gen(node.l.as_ref().unwrap(), f, lv, cl);
+        return;
+    }
+    if node.kind == NodeKind::ND_IFCOND {
+        gen(node.l.as_ref().unwrap(), f, lv, cl);
         return;
     }
 

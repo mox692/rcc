@@ -6,6 +6,13 @@ C compiler written in Rust.
 source = program
 program = stmts*
 stmts = ( stmt | ifstmt )
+
+ifstmt = "if" if_node ( elsif_node )? ( else_node )?
+if_node = "(" if_cond ")" stmts
+elsif_node = "else if" "(" if_cond ")" stmts
+else_node = "else" stmts
+if_cond = equality
+
 ifstmt = "if" "(" equality ")" stmts ( "else if" "(" equality ")" stmts ) ( "else" stmts )?
 stmt = ( assign | return | equality ) ";"
 return = "return" equality

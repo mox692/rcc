@@ -71,3 +71,7 @@ test "if (2 < 5) 34;" 34
 test "if (3 > 2) a = 2; a;" 2
 test "a = 3; b = 2; if (a * b > a + b) return 3; c = 32; return c + c;" 3
 test "a = 3; b = 2; if (a * b < a + b) return 3; c = 32; if (c < b * a) return c + b; d = 22; d + c;" 54
+test "if (2 < 5) 33; else if (3 < 2) 34;" 33
+test "if (2 > 5) 33; else 4; " 4
+test "if (2 > 5) 33; else a = 4; return a;" 4
+

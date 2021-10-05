@@ -32,8 +32,10 @@ pub struct Node {
     pub str: String,
 
     // for if stmt
+    pub if_node: Option<Box<Node>>,
+    pub elsif_node: Option<Box<Node>>,
+    pub else_node: Option<Box<Node>>,
     pub if_cond: Option<Box<Node>>,
-    pub if_stmts: Option<Box<Node>>,
 }
 // if ( A ) { B; } else if( C ) { D; } else { E }
 impl Default for Node {
@@ -45,8 +47,10 @@ impl Default for Node {
             r: None,
             val: 0,
             str: String::new(),
+            if_node: None,
+            elsif_node: None,
+            else_node: None,
             if_cond: None,
-            if_stmts: None,
         };
     }
 }
@@ -68,10 +72,11 @@ pub enum NodeKind {
     ND_BE,
     ND_LT,
     ND_LE,
-    // `if`, `else if`
+    ND_IFSTMT,
     ND_IF,
-    // `else`
     ND_ELSE,
+    ND_ELSIF,
+    ND_IFCOND,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -92,7 +97,11 @@ impl NodeKind {
             NodeKind::ND_BE => "ND_BE",
             NodeKind::ND_LT => "ND_LT",
             NodeKind::ND_LE => "ND_LE",
+            NodeKind::ND_IFSTMT => "ND_IFSTMT",
             NodeKind::ND_IF => "ND_IF",
+            NodeKind::ND_ELSE => "ND_ELSE",
+            NodeKind::ND_ELSIF => "ND_ELSIF",
+            NodeKind::ND_IFCOND => "ND_IFCOND",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -126,7 +135,11 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_BE => write!(f, "ND_BE"),
             NodeKind::ND_LT => write!(f, "ND_LT"),
             NodeKind::ND_LE => write!(f, "ND_LE"),
+            NodeKind::ND_IFSTMT => write!(f, "ND_IFSTMT"),
             NodeKind::ND_IF => write!(f, "ND_IF"),
+            NodeKind::ND_ELSE => write!(f, "ND_ELSE"),
+            NodeKind::ND_ELSIF => write!(f, "ND_ELSIF"),
+            NodeKind::ND_IFCOND => write!(f, "ND_IFCOND"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -223,7 +236,7 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
     };
 }
 
-// gen if node.
+// gen if node. (l: if_cond, r: stmts )
 fn gen_ifstmt_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> {
     return Some(Box::new(Node {
         kind: NodeKind::ND_IF,
@@ -327,11 +340,51 @@ fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// ifstmt = "if" "(" equality ")" stmts ( "else if" "(" equality ")" stmts )* ( "else" stmts )?
-fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
+// l: equality, r: stmts
+fn gen_elsif_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> {
+    return Some(Box::new(Node {
+        l: l,
+        r: r,
+        kind: NodeKind::ND_ELSIF,
+        ..Default::default()
+    }));
+}
+
+// elsif_node = "else if" "(" if_cond ")" stmts
+fn parse_elsif(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().char == "(" {
-        node = parse_equality(tok.next_tok());
+        node = parse_ifcond(tok.next_tok())
+    } else {
+        tok.error(String::from("parse if err."));
+        panic!();
+    }
+    if tok.cur_tok().char == ")" {
+        node = gen_elsif_node(node, parse_stmts(tok.next_tok()));
+    } else {
+        tok.error(String::from("parse if err."));
+        panic!();
+    }
+    return node;
+}
+
+fn gen_ifcond(node: Option<Box<Node>>) -> Option<Box<Node>> {
+    return Some(Box::new(Node {
+        kind: NodeKind::ND_IFCOND,
+        l: node,
+        ..Default::default()
+    }));
+}
+
+fn parse_ifcond(tok: &mut TokenReader) -> Option<Box<Node>> {
+    return gen_ifcond(parse_equality(tok));
+}
+
+// if_node = "(" equality ")" stmts
+fn parse_if(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node: Option<Box<Node>>;
+    if tok.cur_tok().char == "(" {
+        node = parse_ifcond(tok.next_tok());
     } else {
         tok.error(String::from("parse if err."));
         panic!();
@@ -343,6 +396,58 @@ fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         panic!();
     }
     return node;
+}
+
+fn gen_else(node: Option<Box<Node>>) -> Option<Box<Node>> {
+    return Some(Box::new(Node {
+        kind: NodeKind::ND_ELSE,
+        l: node,
+        ..Default::default()
+    }));
+}
+
+// else_node = "else" stmts
+fn parse_else(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let node = gen_else(parse_stmts(tok));
+    return node;
+}
+
+fn gen_ifstmt_node_v2(
+    if_node: Option<Box<Node>>,
+    elsif_node: Option<Box<Node>>,
+    else_node: Option<Box<Node>>,
+) -> Option<Box<Node>> {
+    return Some(Box::new(Node {
+        kind: NodeKind::ND_IFSTMT,
+        if_node: if_node,
+        elsif_node: elsif_node,
+        else_node: else_node,
+        ..Default::default()
+    }));
+}
+
+// ifstmt = "if" if_node ( elsif_node )? ( else_node )?
+fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let if_node = parse_if(tok);
+    let elif_node: Option<Box<Node>>;
+    let else_node: Option<Box<Node>>;
+
+    if tok.cur_tok().kind == TokenKind::ELIF {
+        elif_node = parse_elsif(tok.next_tok());
+        if tok.cur_tok().kind == TokenKind::ELSE {
+            else_node = parse_else(tok.next_tok());
+            return gen_ifstmt_node_v2(if_node, elif_node, else_node);
+        } else {
+            return gen_ifstmt_node_v2(if_node, elif_node, None);
+        }
+    } else {
+        if tok.cur_tok().kind == TokenKind::ELSE {
+            else_node = parse_else(tok.next_tok());
+            return gen_ifstmt_node_v2(if_node, None, else_node);
+        } else {
+            return gen_ifstmt_node_v2(if_node, None, None);
+        }
+    }
 }
 
 // return = "return" equality
@@ -462,11 +567,8 @@ pub fn debug_nodes(flag: bool, nodes: &Vec<Box<Node>>) {
 pub fn read_node(node: &Node, depth: &mut usize) {
     print_node_info(node, depth);
 
-    /*
-        read unary_node.
-    */
-    // mainly for ND_NUM.
-    if node.l.is_none() && node.r.is_none() {
+    // for ND_NUM & ND_IDENT.
+    if node.kind == NodeKind::ND_NUM || node.kind == NodeKind::ND_IDENT {
         return;
     }
 
@@ -475,6 +577,27 @@ pub fn read_node(node: &Node, depth: &mut usize) {
         || node.kind == NodeKind::ND_STMT
         || node.kind == NodeKind::ND_RETURN
     {
+        *depth += 1;
+        read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+        return;
+    }
+
+    // for if_stmt
+    if node.kind == NodeKind::ND_IFSTMT {
+        *depth += 1;
+        read_node(node.if_node.as_ref().unwrap(), depth);
+        if node.elsif_node.is_some() {
+            read_node(node.elsif_node.as_ref().unwrap(), depth);
+        }
+        if node.else_node.is_some() {
+            read_node(node.else_node.as_ref().unwrap(), depth);
+        }
+        *depth -= 1;
+        return;
+    }
+
+    if node.kind == NodeKind::ND_IFCOND {
         *depth += 1;
         read_node(node.l.as_ref().unwrap(), depth);
         *depth -= 1;

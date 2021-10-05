@@ -18,6 +18,19 @@ impl Token {
     }
 }
 
+struct Pos {
+    pos: usize,
+}
+impl Pos {
+    fn new() -> Self {
+        return Pos { pos: 0 };
+    }
+    fn incre(&mut self) -> &mut Self {
+        self.pos += 1;
+        return self;
+    }
+}
+
 #[derive(Clone)]
 struct Tokens(Vec<Token>);
 
@@ -135,7 +148,7 @@ fn call_less(string: &String, ind: &mut usize) -> Token {
 }
 
 pub fn tokenize(string: &String) -> Vec<Token> {
-    let mut ind = 0;
+    let mut pos = Pos::new();
     let len = string.len();
     // tok vec.
     let mut tok_vec = Vec::<Token>::new();
@@ -150,7 +163,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
     tok_vec.push(tok);
 
     loop {
-        let char = string.chars().nth(ind).unwrap();
+        let char = string.chars().nth(pos.pos).unwrap();
 
         // terminated character.
         if char.eq(&'\0') {
@@ -170,36 +183,36 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 '(' => Token::new_token(TokenKind::PUNCT, 0, String::from("(")),
                 ')' => Token::new_token(TokenKind::PUNCT, 0, String::from(")")),
                 // TODO: もう少しきれいに.
-                '=' => call_eq(string, &mut ind),
-                '!' => call_neq(string, &mut ind),
-                '>' => call_big(string, &mut ind),
-                '<' => call_less(string, &mut ind),
+                '=' => call_eq(string, &mut pos.pos),
+                '!' => call_neq(string, &mut pos.pos),
+                '>' => call_big(string, &mut pos.pos),
+                '<' => call_less(string, &mut pos.pos),
                 _ => {
                     panic!("Unknown token.");
                 }
             };
             tok_vec.push(tok);
-            ind += 1;
+            pos.incre();
             continue;
         }
 
         // tokenize num.
         if char.is_ascii_digit() {
             let mut cur_num: i32 = char.to_digit(10).unwrap() as i32;
-            ind += 1;
+            pos.incre();
             loop {
                 // 最後の文字をreadし終わったら
                 // TODO: remove len.
-                if ind == len {
+                if pos.pos == len {
                     break;
                 }
-                let char = string.chars().nth(ind).unwrap();
+                let char = string.chars().nth(pos.pos).unwrap();
                 // 数値でない or 終端に達したら.
                 if !char.is_ascii_digit() {
                     break;
                 }
                 cur_num = cur_num * 10 + char.to_digit(10).unwrap() as i32;
-                ind += 1;
+                pos.incre();
             }
             let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""));
             tok_vec.push(tok);
@@ -210,25 +223,26 @@ pub fn tokenize(string: &String) -> Vec<Token> {
         // ひとまずアルファベットで構成された文字列なら許可する.
         // TODO: local valは2文字目以降は数字·記号も許可する.
         if char.is_ascii_alphabetic() {
-            let mut cur_str: String = char.to_string();
-            ind += 1;
-            loop {
-                let char = string.chars().nth(ind).unwrap();
-                // 数値でない or 終端に達したら.
-                if !char.is_alphabetic() {
-                    break;
-                }
-                cur_str.push(char);
-                ind += 1;
-            }
+            let mut cur_str = read_to_whitespace(&mut pos.pos, string);
+
             // specify token kind by cur_str.
             // TODO: use hashmap
-            let tok_kind: TokenKind = match cur_str.as_str() {
-                "return" => TokenKind::RETURN,
-                "if" => TokenKind::IF,
-                "else" => TokenKind::ELSE,
-                _ => TokenKind::IDENT,
-            };
+            let tok_kind: TokenKind;
+            match cur_str.as_str() {
+                "return" => tok_kind = TokenKind::RETURN,
+                "if" => tok_kind = TokenKind::IF,
+                "else" => {
+                    let mut next_pos = pos.pos + 1;
+                    if read_to_whitespace(&mut next_pos, string).eq("if") {
+                        read_to_whitespace(&mut pos.incre().pos, string);
+                        tok_kind = TokenKind::ELIF;
+                        cur_str.push_str(" if");
+                    } else {
+                        tok_kind = TokenKind::ELSE
+                    }
+                }
+                _ => tok_kind = TokenKind::IDENT,
+            }
             let tok = Token::new_token(tok_kind, 0, cur_str);
             tok_vec.push(tok);
             continue;
@@ -236,12 +250,26 @@ pub fn tokenize(string: &String) -> Vec<Token> {
 
         // whitespaceは飛ばす
         if char.is_whitespace() {
-            ind += 1;
+            pos.incre();
             continue;
         }
         panic!("something wrong...")
     }
     return tok_vec;
+}
+fn read_to_whitespace(ind: &mut usize, string: &String) -> String {
+    let mut cur_str: String = string.chars().nth(*ind).unwrap().to_string();
+    *ind += 1;
+    loop {
+        let char = string.chars().nth(*ind).unwrap();
+        // 文字でない or 終端に達したら.
+        if !char.is_alphabetic() {
+            break;
+        }
+        cur_str.push(char);
+        *ind += 1;
+    }
+    return cur_str;
 }
 
 #[derive(Clone)]

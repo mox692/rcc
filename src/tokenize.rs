@@ -18,6 +18,38 @@ impl Token {
     }
 }
 
+struct Lexer {
+    // input string.
+    pub input: String,
+    // current position.
+    pub pos: usize,
+    // current watching charactor.
+    pub char: char,
+    // input string size.
+    pub len: usize,
+    // vec of generated tokens.
+    pub token_vec: Vec<Token>,
+}
+impl Lexer {
+    fn new(input: String) -> Self {
+        return Lexer {
+            input: input.clone(),
+            pos: 0,
+            char: input.chars().nth(0).unwrap(),
+            len: input.chars().count(),
+            token_vec: Vec::<Token>::new(),
+        };
+    }
+    fn cur_char(&self) -> char {
+        return self.char;
+    }
+    fn next_char(&mut self) -> char {
+        self.pos += 1;
+        self.char = self.input.chars().nth(self.pos).unwrap();
+        return self.char;
+    }
+}
+
 struct Pos {
     pos: usize,
 }

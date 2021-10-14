@@ -64,6 +64,40 @@ impl Lexer {
     fn push_tok(&mut self, tok: Token) {
         &self.token_vec.push(tok);
     }
+    // expect compares the character currently pointed to by Lexer
+    // with the string passed as an argument and returns true if they match.
+    fn expect(&mut self, str: &str) -> bool {
+        for (i, c) in str.chars().enumerate() {
+            if self.get_nth_next(i).eq(&c) {
+                return false;
+            }
+        }
+        return true;
+    }
+    // similar to expect, but it advance l.cur as side effect if it return true.
+    fn expect_and_read(&mut self, str: &str) -> bool {
+        for (i, c) in str.chars().enumerate() {
+            if self.get_nth_next(i).ne(&c) {
+                return false;
+            }
+        }
+        self.next_nth(str.len());
+        return true;
+    }
+    fn read_to_whitespace(&mut self) -> String {
+        let mut cur_str: String = self.cur_char().to_string();
+        self.next();
+        loop {
+            let char = self.cur_char();
+            // 文字でない or 終端に達したら.
+            if !char.is_alphabetic() {
+                break;
+            }
+            cur_str.push(char);
+            self.next();
+        }
+        return cur_str;
+    }
 }
 
 #[derive(Clone)]
@@ -140,117 +174,96 @@ impl PartialEq for TokenKind {
 }
 impl Eq for TokenKind {}
 
-fn call_eq(string: &String, ind: &mut usize) -> Token {
-    let next_char = string.chars().nth(*ind + 1).unwrap();
-    let tok: Token;
-    if next_char.eq(&'=') {
-        tok = Token::new_token(TokenKind::EQ, 0, String::from("=="));
-        // 2つ目の=を指すようになる.
-        *ind += 1;
-    } else {
-        tok = Token::new_token(TokenKind::PUNCT, 0, String::from("="));
-    }
-    return tok;
-}
-
-fn call_neq(string: &String, ind: &mut usize) -> Token {
-    let next_char = string.chars().nth(*ind + 1).unwrap();
-    if next_char.eq(&'=') {
-        *ind += 1;
+// read chars from lexer' current position and if it matches some specific string,
+// then return it as Token.
+fn read_punct(l: &mut Lexer) -> Token {
+    // multi char.
+    if l.expect_and_read("==") {
+        return Token::new_token(TokenKind::EQ, 0, String::from("=="));
+    } else if l.expect_and_read("!=") {
         return Token::new_token(TokenKind::NEQ, 0, String::from("!="));
-    }
-    println!("expect '=', but got {}", next_char);
-    panic!()
-}
-
-// >
-fn call_big(string: &String, ind: &mut usize) -> Token {
-    let next_char = string.chars().nth(*ind + 1).unwrap();
-    if next_char.eq(&'=') {
-        *ind += 1;
+    } else if l.expect_and_read("<=") {
+        return Token::new_token(TokenKind::LE, 0, String::from("<="));
+    } else if l.expect_and_read(">=") {
         return Token::new_token(TokenKind::BE, 0, String::from(">="));
     }
-    return Token::new_token(TokenKind::BT, 0, String::from(">"));
-}
-
-fn call_less(string: &String, ind: &mut usize) -> Token {
-    let next_char = string.chars().nth(*ind + 1).unwrap();
-    if next_char.eq(&'=') {
-        *ind += 1;
-        return Token::new_token(TokenKind::LE, 0, String::from("<="));
+    // single char.
+    if l.expect_and_read("=") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("="));
+    } else if l.expect_and_read("<") {
+        return Token::new_token(TokenKind::LT, 0, String::from("<"));
+    } else if l.expect_and_read(">") {
+        return Token::new_token(TokenKind::BT, 0, String::from(">"));
+    } else if l.expect_and_read("+") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("+"));
+    } else if l.expect_and_read("-") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("-"));
+    } else if l.expect_and_read("*") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("*"));
+    } else if l.expect_and_read("/") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("/"));
+    } else if l.expect_and_read(";") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from(";"));
+    } else if l.expect_and_read("(") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("("));
+    } else if l.expect_and_read(")") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from(")"));
     }
-    return Token::new_token(TokenKind::LT, 0, String::from("<"));
+    panic!("");
 }
 
 pub fn tokenize(string: &String) -> Vec<Token> {
-    let mut _l = Lexer::new(string.clone());
-    let _tok = Token {
+    let mut l = Lexer::new(string.clone());
+    let tok = Token {
         kind: TokenKind::INI,
         value: 0,
         char: String::from(""),
         next_token: None,
     };
 
-    _l.push_tok(_tok);
+    l.push_tok(tok);
 
     loop {
-        let _char = _l.cur_char();
-        if _char.eq(&'\0') {
+        let char = l.cur_char();
+        if char.eq(&'\0') {
             let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"));
-            _l.push_tok(tok);
+            l.push_tok(tok);
             break;
         }
 
-        if _char.is_ascii_punctuation() {
-            let tok = match _char {
-                '+' => Token::new_token(TokenKind::PUNCT, 0, String::from("+")),
-                '-' => Token::new_token(TokenKind::PUNCT, 0, String::from("-")),
-                '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
-                '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
-                ';' => Token::new_token(TokenKind::PUNCT, 0, String::from(";")),
-                '(' => Token::new_token(TokenKind::PUNCT, 0, String::from("(")),
-                ')' => Token::new_token(TokenKind::PUNCT, 0, String::from(")")),
-                // TODO: もう少しきれいに.
-                '=' => call_eq(&_l.input, &mut _l.pos),
-                '!' => call_neq(&_l.input, &mut _l.pos),
-                '>' => call_big(&_l.input, &mut _l.pos),
-                '<' => call_less(&_l.input, &mut _l.pos),
-                _ => {
-                    panic!("Unknown token.");
-                }
-            };
-            _l.push_tok(tok);
-            _l.next_char();
+        if char.is_ascii_punctuation() {
+            let tok = read_punct(&mut l);
+            l.push_tok(tok);
             continue;
         }
 
-        if _char.is_ascii_digit() {
-            let mut cur_num: i32 = _char.to_digit(10).unwrap() as i32;
-            _l.next_char();
+        if char.is_ascii_digit() {
+            let mut cur_num: i32 = char.to_digit(10).unwrap() as i32;
+            l.next_char();
             loop {
                 // 最後の文字をreadし終わったら
                 // TODO: remove len.
-                if _l.pos == _l.len {
+                if l.pos == l.len {
                     break;
                 }
-                let char = _l.cur_char();
+                let char = l.cur_char();
                 // 数値でない or 終端に達したら.
                 if !char.is_ascii_digit() {
                     break;
                 }
                 cur_num = cur_num * 10 + char.to_digit(10).unwrap() as i32;
-                _l.next_char();
+                l.next_char();
             }
             let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""));
-            _l.push_tok(tok);
+            l.push_tok(tok);
             continue;
         }
 
         // local variable or C specific keyword.
         // ひとまずアルファベットで構成された文字列なら許可する.
         // TODO: local valは2文字目以降は数字·記号も許可する.
-        if _char.is_ascii_alphabetic() {
-            let mut cur_str = read_to_whitespace(&mut _l);
+        if char.is_ascii_alphabetic() {
+            let mut cur_str = l.read_to_whitespace();
             // specify token kind by cur_str.
             // TODO: use hashmap
             let tok_kind: TokenKind;
@@ -259,8 +272,8 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 "if" => tok_kind = TokenKind::IF,
                 "else" => {
                     // read whitespace.
-                    _l.next();
-                    if expect_and_read(&mut _l, "if") {
+                    l.next();
+                    if l.expect_and_read("if") {
                         tok_kind = TokenKind::ELIF;
                         cur_str.push_str(" if");
                     } else {
@@ -270,55 +283,19 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 _ => tok_kind = TokenKind::IDENT,
             }
             let tok = Token::new_token(tok_kind, 0, cur_str);
-            _l.push_tok(tok);
+            l.push_tok(tok);
             continue;
         }
 
         // whitespaceは飛ばす
-        if _char.is_whitespace() {
-            _l.next();
+        if char.is_whitespace() {
+            l.next();
             continue;
         }
         panic!("something wrong...")
     }
     // return tok_vec;
-    return _l.token_vec;
-}
-fn read_to_whitespace(_l: &mut Lexer) -> String {
-    let mut cur_str: String = _l.cur_char().to_string();
-    _l.next();
-    loop {
-        let char = _l.cur_char();
-        // 文字でない or 終端に達したら.
-        if !char.is_alphabetic() {
-            break;
-        }
-        cur_str.push(char);
-        _l.next();
-    }
-    return cur_str;
-}
-
-// expect compares the character currently pointed to by Lexer
-// with the string passed as an argument and returns true if they match.
-fn expect(_l: &mut Lexer, str: &str) -> bool {
-    for (i, c) in str.chars().enumerate() {
-        if _l.get_nth_next(i).eq(&c) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// similar to expect, but it advance l.cur as side effect if it return true.
-fn expect_and_read(_l: &mut Lexer, str: &str) -> bool {
-    for (i, c) in str.chars().enumerate() {
-        if _l.get_nth_next(i).ne(&c) {
-            return false;
-        }
-    }
-    _l.next_nth(str.len());
-    return true;
+    return l.token_vec;
 }
 
 #[derive(Clone)]

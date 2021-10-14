@@ -12,13 +12,11 @@ if_node = "(" if_cond ")" stmts
 elsif_node = "else if" "(" if_cond ")" stmts
 else_node = "else" stmts
 if_cond = equality
-
-ifstmt = "if" "(" equality ")" stmts ( "else if" "(" equality ")" stmts ) ( "else" stmts )?
 stmt = ( assign | return | equality ) ";"
 return = "return" equality
 equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?
 assign = &ident ( "=" equality )*
-expr = ( add_sub | &ident )
+expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
 unary = &num | &ident

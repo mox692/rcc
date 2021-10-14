@@ -1,24 +1,3 @@
-/*
-    memo:
-    * tokenの消費はgenXXX()系の関数の引数にtok.next_tok()を渡してtokenを進めるか、
-    genXXX()系の関数内でtokenを進めるようにする.(parseXXX系の中では進めないようにする.)
-*/
-
-/*
-    EBNF: ('&' express terminal symbol.)
-
-    output = program
-    program = stmt*
-    stmt = ( assign | expr ) ";"
-    assign = &ident ( "=" expr )*
-    expr = ( add_sub | &ident )
-    add_sub = mul_div( "+" mul_div | "-" mul_div )*
-    mul_div = unary ( "*" unary | "/" unary )*
-    unary = &num | &ident
-
-    ·exprには即値と変数が混在しうる.有効な変数かどうかの判定は別途行う.
-*/
-
 use crate::tokenize::{TokenKind, TokenReader};
 
 #[derive(Clone)]
@@ -37,7 +16,6 @@ pub struct Node {
     pub else_node: Option<Box<Node>>,
     pub if_cond: Option<Box<Node>>,
 }
-// if ( A ) { B; } else if( C ) { D; } else { E }
 impl Default for Node {
     fn default() -> Self {
         return Node {
@@ -147,14 +125,6 @@ impl std::fmt::Display for NodeKind {
     }
 }
 
-// unary_node = num
-fn gen_unary_node(kind: NodeKind, tok: &mut TokenReader) -> Option<Box<Node>> {
-    match kind {
-        NodeKind::ND_NUM => return gen_num_node(tok),
-        _ => panic!("Invalid node kind."),
-    }
-}
-
 fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_EXPR,
@@ -237,7 +207,7 @@ fn gen_binary_node(kind: NodeKind, l: Option<Box<Node>>, r: Option<Box<Node>>) -
 }
 
 // gen if node. (l: if_cond, r: stmts )
-fn gen_ifstmt_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> {
+fn gen_if_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> {
     return Some(Box::new(Node {
         kind: NodeKind::ND_IF,
         l: l,
@@ -261,8 +231,6 @@ fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
 // mul_div = unary ( "*" unary | "/" unary )*
 fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = parse_unary(tok);
-    // let mut node = gen_unary_node(NodeKind::ND_NUM, tok);
-
     loop {
         match tok.cur_tok().char.as_str() {
             "*" => {
@@ -289,7 +257,6 @@ fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
 // add_sub = mul_div("+" mul_div | "-" mul_div)*
 fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = parse_mul_div(tok);
-    // process '+', '-' token.
     loop {
         match tok.cur_tok().char.as_str() {
             "+" => {
@@ -323,11 +290,9 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
 
 // assign = &ident ( "=" equality )*
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
-    // 左辺のidentをparse.
     let mut node = gen_ident_node(tok);
     loop {
         if tok.expect("=") {
-            // 右辺のexprをparse.
             node = Some(Box::new(gen_binary_node(
                 NodeKind::ND_ASSIGN,
                 node,
@@ -376,11 +341,12 @@ fn gen_ifcond(node: Option<Box<Node>>) -> Option<Box<Node>> {
     }));
 }
 
+// if_cond = equality
 fn parse_ifcond(tok: &mut TokenReader) -> Option<Box<Node>> {
     return gen_ifcond(parse_equality(tok));
 }
 
-// if_node = "(" equality ")" stmts
+// if_node = "(" if_cond ")" stmts
 fn parse_if(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().char == "(" {
@@ -390,7 +356,7 @@ fn parse_if(tok: &mut TokenReader) -> Option<Box<Node>> {
         panic!();
     }
     if tok.cur_tok().char == ")" {
-        node = gen_ifstmt_node(node, parse_stmt(tok.next_tok()));
+        node = gen_if_node(node, parse_stmt(tok.next_tok()));
     } else {
         tok.error(String::from("parse if err."));
         panic!();
@@ -412,7 +378,7 @@ fn parse_else(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-fn gen_ifstmt_node_v2(
+fn gen_ifstmt_node(
     if_node: Option<Box<Node>>,
     elsif_node: Option<Box<Node>>,
     else_node: Option<Box<Node>>,
@@ -436,16 +402,16 @@ fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         elif_node = parse_elsif(tok.next_tok());
         if tok.cur_tok().kind == TokenKind::ELSE {
             else_node = parse_else(tok.next_tok());
-            return gen_ifstmt_node_v2(if_node, elif_node, else_node);
+            return gen_ifstmt_node(if_node, elif_node, else_node);
         } else {
-            return gen_ifstmt_node_v2(if_node, elif_node, None);
+            return gen_ifstmt_node(if_node, elif_node, None);
         }
     } else {
         if tok.cur_tok().kind == TokenKind::ELSE {
             else_node = parse_else(tok.next_tok());
-            return gen_ifstmt_node_v2(if_node, None, else_node);
+            return gen_ifstmt_node(if_node, None, else_node);
         } else {
-            return gen_ifstmt_node_v2(if_node, None, None);
+            return gen_ifstmt_node(if_node, None, None);
         }
     }
 }
@@ -478,17 +444,13 @@ fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// stmt = ( assign | return | equality | ifstmt ) ";"
+// stmt = ( assign | return | equality ) ";"
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
         node = parse_assign(tok);
     } else if tok.cur_tok().kind == TokenKind::RETURN {
         node = parse_return(tok);
-    } else if tok.cur_tok().kind == TokenKind::IF {
-        node = parse_ifstmt(tok.next_tok());
-        // MEMO: ifは末尾に";"が来るのでここでreturn.
-        return node;
     } else {
         node = parse_equality(tok);
     }

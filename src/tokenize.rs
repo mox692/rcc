@@ -43,10 +43,17 @@ impl Lexer {
     fn cur_char(&self) -> char {
         return self.char;
     }
+    fn next(&mut self) -> &mut Self {
+        self.pos += 1;
+        return self;
+    }
     fn next_char(&mut self) -> char {
         self.pos += 1;
         self.char = self.input.chars().nth(self.pos).unwrap();
         return self.char;
+    }
+    fn push_tok(&mut self, tok: Token) {
+        &self.token_vec.push(tok);
     }
 }
 
@@ -180,6 +187,7 @@ fn call_less(string: &String, ind: &mut usize) -> Token {
 }
 
 pub fn tokenize(string: &String) -> Vec<Token> {
+    let mut _l = Lexer::new(string.clone());
     let mut pos = Pos::new();
     let len = string.len();
     // tok vec.
@@ -191,18 +199,30 @@ pub fn tokenize(string: &String) -> Vec<Token> {
         char: String::from(""),
         next_token: None,
     };
+    let _tok = Token {
+        kind: TokenKind::INI,
+        value: 0,
+        char: String::from(""),
+        next_token: None,
+    };
 
     tok_vec.push(tok);
+    _l.push_tok(_tok);
 
     loop {
         let char = string.chars().nth(pos.pos).unwrap();
-
+        let _char = _l.cur_char();
         // terminated character.
         if char.eq(&'\0') {
             let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"));
             tok_vec.push(tok);
             break;
         }
+        // if _char.eq(&'\0') {
+        //     let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"));
+        //     _l.push_tok(tok);
+        //     break;
+        // }
 
         // tokenize punct.
         if char.is_ascii_punctuation() {
@@ -227,6 +247,28 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             pos.incre();
             continue;
         }
+        // if _char.is_ascii_punctuation() {
+        //     let tok = match char {
+        //         '+' => Token::new_token(TokenKind::PUNCT, 0, String::from("+")),
+        //         '-' => Token::new_token(TokenKind::PUNCT, 0, String::from("-")),
+        //         '*' => Token::new_token(TokenKind::PUNCT, 0, String::from("*")),
+        //         '/' => Token::new_token(TokenKind::PUNCT, 0, String::from("/")),
+        //         ';' => Token::new_token(TokenKind::PUNCT, 0, String::from(";")),
+        //         '(' => Token::new_token(TokenKind::PUNCT, 0, String::from("(")),
+        //         ')' => Token::new_token(TokenKind::PUNCT, 0, String::from(")")),
+        //         // TODO: もう少しきれいに.
+        //         '=' => call_eq(&_l.input, &mut _l.pos),
+        //         '!' => call_neq(&_l.input, &mut _l.pos),
+        //         '>' => call_big(&_l.input, &mut _l.pos),
+        //         '<' => call_less(&_l.input, &mut _l.pos),
+        //         _ => {
+        //             panic!("Unknown token.");
+        //         }
+        //     };
+        //     _l.push_tok(tok);
+        //     _l.next_char();
+        //     continue;
+        // }
 
         // tokenize num.
         if char.is_ascii_digit() {
@@ -250,6 +292,27 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             tok_vec.push(tok);
             continue;
         }
+        // if _char.is_ascii_digit() {
+        //     let mut cur_num: i32 = char.to_digit(10).unwrap() as i32;
+        //     _l.next_char();
+        //     loop {
+        //         // 最後の文字をreadし終わったら
+        //         // TODO: remove len.
+        //         if _l.pos == _l.len {
+        //             break;
+        //         }
+        //         let char = _l.cur_char();
+        //         // 数値でない or 終端に達したら.
+        //         if !char.is_ascii_digit() {
+        //             break;
+        //         }
+        //         cur_num = cur_num * 10 + char.to_digit(10).unwrap() as i32;
+        //         _l.next_char();
+        //     }
+        //     let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""));
+        //     _l.push_tok(tok);
+        //     continue;
+        // }
 
         // local variable or C specific keyword.
         // ひとまずアルファベットで構成された文字列なら許可する.
@@ -280,14 +343,46 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             continue;
         }
 
+        // if _char.is_ascii_alphabetic() {
+        //     let mut cur_str = read_to_whitespace(&mut _l.pos, &_l.input);
+
+        //     // specify token kind by cur_str.
+        //     // TODO: use hashmap
+        //     let tok_kind: TokenKind;
+        //     match cur_str.as_str() {
+        //         "return" => tok_kind = TokenKind::RETURN,
+        //         "if" => tok_kind = TokenKind::IF,
+        //         "else" => {
+        //             let input_cpy = _l.input.clone();
+        //             let mut next_pos = _l.pos + 1;
+        //             if read_to_whitespace(&mut next_pos, &_l.input).eq("if") {
+        //                 read_to_whitespace(&mut _l.next().pos, &input_cpy);
+        //                 tok_kind = TokenKind::ELIF;
+        //                 cur_str.push_str(" if");
+        //             } else {
+        //                 tok_kind = TokenKind::ELSE
+        //             }
+        //         }
+        //         _ => tok_kind = TokenKind::IDENT,
+        //     }
+        //     let tok = Token::new_token(tok_kind, 0, cur_str);
+        //     _l.push_tok(tok);
+        //     continue;
+        // }
+
         // whitespaceは飛ばす
         if char.is_whitespace() {
             pos.incre();
             continue;
         }
+        // if _char.is_whitespace() {
+        //     _l.next();
+        //     continue;
+        // }
         panic!("something wrong...")
     }
     return tok_vec;
+    return _l.token_vec;
 }
 fn read_to_whitespace(ind: &mut usize, string: &String) -> String {
     let mut cur_str: String = string.chars().nth(*ind).unwrap().to_string();

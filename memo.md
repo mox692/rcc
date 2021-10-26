@@ -18,6 +18,35 @@
 * とはいえ、ちょっとコードがかなり汚くなってきたので、一旦ここでリファくたしたい.
 
 
-### refactorポイント
+### TODO
+* local valの再代入処理.
+  * 同じシンボルに対する再代入が今はできなくてる.
 * Error処理
   * parser, codegen, tokenizerでそれぞれ違ってくるかも.
+* for文の最後の構文が、(再代入できない故)exprになっている
+  * i++みたいなことは現状できなくなっている
+  * supportした後に、ここの文法は改める.
+* for文とかif文のstmtsは、program(stmts*)では現状ダメということになっている.
+  * これも明らかにおかしい.
+
+### Current Syntax
+```
+source = program
+program = stmts*
+stmts = ( stmt | ifstmt | forstmt)
+
+forstmt = "for" "(" assign ";" equality ";" expr ")" stmts
+ifstmt = "if" if_node ( elsif_node )? ( else_node )?
+if_node = "(" if_cond ")" stmts
+elsif_node = "else if" "(" if_cond ")" stmts
+else_node = "else" stmts
+if_cond = equality
+stmt = ( assign | return | equality ) ";"
+return = "return" equality
+equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?
+assign = &ident ( "=" equality )*
+expr = add_sub
+add_sub = mul_div( "+" mul_div | "-" mul_div )*
+mul_div = unary ( "*" unary | "/" unary )*
+unary = &num | &ident
+```

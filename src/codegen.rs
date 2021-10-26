@@ -24,6 +24,8 @@ impl LocalVariable {
     fn incre_count(&mut self) {
         self.count += 1;
     }
+    // new_offset gets symbol name given from codegenarator,
+    // and returns offset from rbp.
     fn new_offset(&mut self, symbol: String) -> usize {
         let new_offset = (self.count + 1) * 8;
         self.incre_count();
@@ -68,10 +70,13 @@ pub fn codegen(nodes: &Vec<Box<Node>>) {
     writeln!(f, "pushq %rbp");
     writeln!(f, "movq %rsp, %rbp");
 
-    // TODO: hard code
+    // TODO: hard code.
+    // 関数をsupportする時に、ここはなんとかする.現在はstackは128byteの固定長.
     writeln!(f, "sub $128, %rsp");
 
     // 各stmt毎にcodegen.
+    // TODO: 将来的には(Nodeというより)Function毎にcodegenをしていくイメージ.
+    //       また、関数ごとに(上で書いている様な)prologue,epilogueの処理を入れる.
     for node in nodes {
         gen(node, &mut f, &mut lv, &mut cl);
     }
@@ -108,9 +113,9 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         return;
     }
     if node.kind == NodeKind::ND_IDENT {
-        // node.strに対応するmemoryからデータを取ってきて、stackにpushする.
+        // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
         writeln!(f, "lea -{}(%rbp), %rax", lv.get_offset(node.str.clone()));
-        // TODO: get_addrに(変数が見つからなかった際の)errハンドリングもやらせる
+        // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
         writeln!(f, "push %rax");
         return;
@@ -138,13 +143,16 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         writeln!(f, "mov %rax, (%rdi)");
         return;
     }
+    // NodeKind::ND_IFSTMT is the node that will be the entry
+    // for all if statements. This block calls the ND_IF, ND_ELSIF,
+    // and ND_ELSE statement codegen.
     if node.kind == NodeKind::ND_IFSTMT {
         cl.cur_index += 1;
         let if_node = node.if_node.as_ref().unwrap();
         let elsif_node = node.elsif_node.as_ref();
         let else_node = node.else_node.as_ref();
 
-        // call if
+        // codegen ND_IF
         gen(if_node, f, lv, cl);
 
         if !elsif_node.is_none() {

@@ -19,14 +19,5 @@
 
 
 ### refactorポイント
-* tokenizer
-  * tokenizer専用のstructを作る
-    * string, index, curなどをまとめて扱いたい
-* parser
-  * parse unary, parse binaryなどを止める.
-  * 順番を揃える.
-  * 
-* codegen
-  * lv, clをこれまた1つにまとめたい.
-* その他
-  * readmeの文法とparserの文法があっているか.
+* Error処理
+  * parser, codegen, tokenizerでそれぞれ違ってくるかも.

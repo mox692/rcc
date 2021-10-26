@@ -1,11 +1,11 @@
 C compiler written in Rust.
 
 ### feature.
-- [ ] Basic calculation(+,-,*,/)
-- [ ] equalities( ==, !=, <, <=, >, >= )
-- [ ] local val.
-- [ ] return stmt.
-- [ ] if statement.
+- [x] Basic calculation(+,-,*,/)
+- [x] equalities( ==, !=, <, <=, >, >= )
+- [x] local val.
+- [x] return stmt.
+- [x] if statement.
 - [ ] for statement
 - [ ] function.
 - [ ] type.

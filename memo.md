@@ -28,6 +28,7 @@
   * supportした後に、ここの文法は改める.
 * for文とかif文のstmtsは、program(stmts*)では現状ダメということになっている.
   * これも明らかにおかしい.
+* for文の3つの要素は、普通のC言語では任意(あってもなくても良い、for(;;)みたいな書き方ができる)だが、今は3つがないとできない.
 
 ### Current Syntax
 ```
@@ -40,7 +41,7 @@ ifstmt = "if" if_node ( elsif_node )? ( else_node )?
 if_node = "(" if_cond ")" stmts
 elsif_node = "else if" "(" if_cond ")" stmts
 else_node = "else" stmts
-if_cond = equality
+if_cond = equalit
 stmt = ( assign | return | equality ) ";"
 return = "return" equality
 equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?

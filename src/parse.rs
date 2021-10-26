@@ -15,6 +15,12 @@ pub struct Node {
     pub elsif_node: Option<Box<Node>>,
     pub else_node: Option<Box<Node>>,
     pub if_cond: Option<Box<Node>>,
+
+    pub for_node: Option<Box<Node>>,
+    pub for_node_first_assign: Option<Box<Node>>,
+    pub for_node_second_condition: Option<Box<Node>>,
+    pub for_node_third_expr: Option<Box<Node>>,
+    pub for_node_stmts: Option<Box<Node>>,
 }
 impl Default for Node {
     fn default() -> Self {
@@ -29,6 +35,11 @@ impl Default for Node {
             elsif_node: None,
             else_node: None,
             if_cond: None,
+            for_node: None,
+            for_node_first_assign: None,
+            for_node_second_condition: None,
+            for_node_third_expr: None,
+            for_node_stmts: None,
         };
     }
 }
@@ -55,6 +66,7 @@ pub enum NodeKind {
     ND_ELSE,
     ND_ELSIF,
     ND_IFCOND,
+    ND_FOR,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -80,6 +92,7 @@ impl NodeKind {
             NodeKind::ND_ELSE => "ND_ELSE",
             NodeKind::ND_ELSIF => "ND_ELSIF",
             NodeKind::ND_IFCOND => "ND_IFCOND",
+            NodeKind::ND_FOR => "ND_FOR",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -118,6 +131,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_ELSE => write!(f, "ND_ELSE"),
             NodeKind::ND_ELSIF => write!(f, "ND_ELSIF"),
             NodeKind::ND_IFCOND => write!(f, "ND_IFCOND"),
+            NodeKind::ND_FOR => write!(f, "ND_FOR"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -416,6 +430,47 @@ fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     }
 }
 
+// forstmt = "for" "(" assign ";" equality ";" expr ")" stmts
+fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node: Box<Node> = Box::new(Node {
+        kind: NodeKind::ND_FOR,
+        ..Default::default()
+    });
+    if tok.cur_tok().char == "(" {
+        node.for_node_first_assign = parse_assign(tok.next_tok());
+    } else {
+        tok.error(String::from("parse for err.(expect `(`)"));
+        panic!();
+    }
+    if tok.cur_tok().char == ";" {
+        node.for_node_second_condition = parse_equality(tok.next_tok());
+    } else {
+        tok.error(String::from("parse for err.(expect `;`)"));
+        panic!();
+    }
+    if tok.cur_tok().char == ";" {
+        node.for_node_third_expr = parse_expr(tok.next_tok());
+    } else {
+        tok.error(String::from("parse for err.(expect `;`)"));
+        panic!();
+    }
+
+    if tok.expect(";") {
+        tok.next_tok();
+    } else {
+        tok.error(String::from("parse for err.(expect `;`)"));
+        panic!();
+    }
+
+    if tok.cur_tok().char == ")" {
+        node.for_node_stmts = parse_stmts(tok.next_tok());
+    } else {
+        tok.error(String::from("parse for err.(expect `)`"));
+        panic!();
+    }
+    return Some(node);
+}
+
 // return = "return" equality
 fn parse_return(tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = gen_return_node(parse_equality(tok.next_tok()));
@@ -466,11 +521,15 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     panic!("");
 }
 
-// stmts = ( stmt | ifstmt )
+// stmts = ( stmt | ifstmt | forstmt )
 fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
     let node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IF {
         node = parse_ifstmt(tok.next_tok());
+        return node;
+    }
+    if tok.cur_tok().kind == TokenKind::FOR {
+        node = parse_forstmt(tok.next_tok());
         return node;
     }
     node = parse_stmt(tok);
@@ -541,6 +600,17 @@ pub fn read_node(node: &Node, depth: &mut usize) {
     {
         *depth += 1;
         read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+        return;
+    }
+
+    // for for_stmt
+    if node.kind == NodeKind::ND_FOR {
+        *depth += 1;
+        read_node(node.for_node_first_assign.as_ref().unwrap(), depth);
+        read_node(node.for_node_second_condition.as_ref().unwrap(), depth);
+        read_node(node.for_node_third_expr.as_ref().unwrap(), depth);
+        read_node(node.for_node_stmts.as_ref().unwrap(), depth);
         *depth -= 1;
         return;
     }

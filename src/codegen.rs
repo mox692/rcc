@@ -143,6 +143,31 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         writeln!(f, "mov %rax, (%rdi)");
         return;
     }
+
+    if node.kind == NodeKind::ND_FOR {
+        // To prevent name crash, we assign unique
+        // (as long as this for scope) label.
+        let for_start_label = format!("L_FOR_START{}", cl.cur_label_index());
+        let for_end_label = format!("L_FOR_END{}", cl.cur_label_index());
+
+        // Assuming that for or if will be called recursively,
+        // increment the label index at this timing.
+        cl.cur_index += 1;
+
+        gen(node.for_node_first_assign.as_ref().unwrap(), f, lv, cl);
+        writeln!(f, ".{}:", for_start_label);
+        gen(node.for_node_stmts.as_ref().unwrap(), f, lv, cl);
+        gen(node.for_node_second_condition.as_ref().unwrap(), f, lv, cl);
+        writeln!(f, "pop %rax");
+        writeln!(f, "mov $1, %rdi");
+        writeln!(f, "cmp %rdi, %rax");
+        writeln!(f, "jne .{}", for_end_label);
+        gen(node.for_node_third_expr.as_ref().unwrap(), f, lv, cl);
+        writeln!(f, "jmp .{}", for_start_label);
+        writeln!(f, ".{}:", for_end_label);
+        return;
+    }
+
     // NodeKind::ND_IFSTMT is the node that will be the entry
     // for all if statements. This block calls the ND_IF, ND_ELSIF,
     // and ND_ELSE statement codegen.

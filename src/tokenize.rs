@@ -121,6 +121,7 @@ pub enum TokenKind {
     IF,
     ELIF,
     ELSE,
+    FOR,
 }
 
 impl TokenKind {
@@ -141,6 +142,7 @@ impl TokenKind {
             TokenKind::IF => "IF",
             TokenKind::ELIF => "ELIF",
             TokenKind::ELSE => "ELSE",
+            TokenKind::FOR=> "FOR",
         }
     }
 }
@@ -163,6 +165,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::IF => write!(f, "IF"),
             TokenKind::ELIF => write!(f, "ELIF"),
             TokenKind::ELSE => write!(f, "ELSE"),
+            TokenKind::FOR=> write!(f, "FOR"),
         }
     }
 }
@@ -268,6 +271,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             // TODO: use hashmap
             let tok_kind: TokenKind;
             match cur_str.as_str() {
+                "for"  => tok_kind = TokenKind::FOR,
                 "return" => tok_kind = TokenKind::RETURN,
                 "if" => tok_kind = TokenKind::IF,
                 "else" => {

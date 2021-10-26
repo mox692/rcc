@@ -6,6 +6,7 @@ C compiler written in Rust.
 - [x] local val.
 - [x] return stmt.
 - [x] if statement.
-- [ ] for statement
+- [x] for statement.
+- [x] block statement.
 - [ ] function.
 - [ ] type.

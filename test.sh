@@ -77,5 +77,9 @@ test "if (2 > 5) 33; else a = 4; return a;" 4
 
 # for statement.
 test "for (a = 2;  10 < 3; 3+2;) b = 3; 2; return b;" 3
-test "for (a = 2;  10 < 3; 3+2;) for(c = 0; c > 10; 3;) d = 3; 2; return d;" 3
+# test "for (a = 2;  10 < 3; 3+2;) for(c = 0; c > 10; 3;) d = 3; 2; return d;" 3
+
+# block
+test "{3; 3;3; } return 3;" 3
+test "if(3>2){a=3;if(a > 2){3;} }" 3
 

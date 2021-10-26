@@ -21,6 +21,10 @@ pub struct Node {
     pub for_node_second_condition: Option<Box<Node>>,
     pub for_node_third_expr: Option<Box<Node>>,
     pub for_node_stmts: Option<Box<Node>>,
+
+    // for stmts2
+    pub stmts2: Vec<Option<Box<Node>>>,
+    pub stmts2_len: usize,
 }
 impl Default for Node {
     fn default() -> Self {
@@ -40,6 +44,8 @@ impl Default for Node {
             for_node_second_condition: None,
             for_node_third_expr: None,
             for_node_stmts: None,
+            stmts2: Vec::new(),
+            stmts2_len: 0,
         };
     }
 }
@@ -67,6 +73,7 @@ pub enum NodeKind {
     ND_ELSIF,
     ND_IFCOND,
     ND_FOR,
+    ND_STMT2,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -93,6 +100,7 @@ impl NodeKind {
             NodeKind::ND_ELSIF => "ND_ELSIF",
             NodeKind::ND_IFCOND => "ND_IFCOND",
             NodeKind::ND_FOR => "ND_FOR",
+            NodeKind::ND_STMT2 => "ND_STMT2",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -132,6 +140,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_ELSIF => write!(f, "ND_ELSIF"),
             NodeKind::ND_IFCOND => write!(f, "ND_IFCOND"),
             NodeKind::ND_FOR => write!(f, "ND_FOR"),
+            NodeKind::ND_STMT2 => write!(f, "ND_STMT2"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -237,7 +246,7 @@ fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
     } else if tok.cur_tok().kind == TokenKind::IDENT {
         return gen_ident_node(tok);
     } else {
-        tok.error(String::from("unexpected unary."));
+        tok.error(String::from("expect TokenKind::IDENT, but not."));
         panic!("");
     }
 }
@@ -339,7 +348,7 @@ fn parse_elsif(tok: &mut TokenReader) -> Option<Box<Node>> {
         panic!();
     }
     if tok.cur_tok().char == ")" {
-        node = gen_elsif_node(node, parse_stmts(tok.next_tok()));
+        node = gen_elsif_node(node, parse_stmts2(tok.next_tok()));
     } else {
         tok.error(String::from("parse if err."));
         panic!();
@@ -370,7 +379,7 @@ fn parse_if(tok: &mut TokenReader) -> Option<Box<Node>> {
         panic!();
     }
     if tok.cur_tok().char == ")" {
-        node = gen_if_node(node, parse_stmt(tok.next_tok()));
+        node = gen_if_node(node, parse_stmts2(tok.next_tok()));
     } else {
         tok.error(String::from("parse if err."));
         panic!();
@@ -388,7 +397,7 @@ fn gen_else(node: Option<Box<Node>>) -> Option<Box<Node>> {
 
 // else_node = "else" stmts
 fn parse_else(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let node = gen_else(parse_stmts(tok));
+    let node = gen_else(parse_stmts2(tok));
     return node;
 }
 
@@ -463,7 +472,7 @@ fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     }
 
     if tok.cur_tok().char == ")" {
-        node.for_node_stmts = parse_stmts(tok.next_tok());
+        node.for_node_stmts = parse_stmts2(tok.next_tok());
     } else {
         tok.error(String::from("parse for err.(expect `)`"));
         panic!();
@@ -521,7 +530,37 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     panic!("");
 }
 
-// stmts = ( stmt | ifstmt | forstmt )
+// stmts2 = "{" stmts* "}" | stmt
+fn parse_stmts2(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node = Box::new(Node {
+        ..Default::default()
+    });
+
+    let mut stmts: Vec<Option<Box<Node>>> = Vec::new();
+    if tok.cur_tok().char == "{" {
+        let mut c = 0;
+        tok.next();
+        loop {
+            // 2
+            let _node = parse_stmts(tok);
+            stmts.push(_node);
+            c += 1;
+            if tok.cur_tok().char == "}" {
+                node.kind = NodeKind::ND_STMT2;
+                node.stmts2 = stmts;
+                node.stmts2_len = c;
+                tok.next();
+                return Some(node);
+            }
+        }
+    }
+    // one stmt.
+    node = parse_stmt(tok).unwrap();
+    node.kind = NodeKind::ND_STMT;
+    return Some(node);
+}
+
+// stmts = ( stmts2 | ifstmt | forstmt )
 fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
     let node: Option<Box<Node>>;
     if tok.cur_tok().kind == TokenKind::IF {
@@ -532,7 +571,7 @@ fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
         node = parse_forstmt(tok.next_tok());
         return node;
     }
-    node = parse_stmt(tok);
+    node = parse_stmts2(tok);
     return node;
 }
 
@@ -632,6 +671,20 @@ pub fn read_node(node: &Node, depth: &mut usize) {
     if node.kind == NodeKind::ND_IFCOND {
         *depth += 1;
         read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+        return;
+    }
+
+    if node.kind == NodeKind::ND_STMT2 {
+        *depth += 1;
+        let mut i = 0;
+        loop {
+            if i == node.stmts2_len {
+                break;
+            }
+            read_node(node.stmts2[i].as_ref().unwrap(), depth);
+            i += 1;
+        }
         *depth -= 1;
         return;
     }

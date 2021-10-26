@@ -34,13 +34,13 @@
 ```
 source = program
 program = stmts*
-stmts = ( stmt | ifstmt | forstmt)
-
-forstmt = "for" "(" assign ";" equality ";" expr ")" stmts
+stmts = ( stmts2 | ifstmt | forstmt)
+stmts2 = "{" parse_stmts* "}" | stmt
+forstmt = "for" "(" assign ";" equality ";" expr ")" stmts2
 ifstmt = "if" if_node ( elsif_node )? ( else_node )?
-if_node = "(" if_cond ")" stmts
-elsif_node = "else if" "(" if_cond ")" stmts
-else_node = "else" stmts
+if_node = "(" if_cond ")" stmts2
+elsif_node = "else if" "(" if_cond ")" stmts2
+else_node = "else" stmts2
 if_cond = equalit
 stmt = ( assign | return | equality ) ";"
 return = "return" equality

@@ -144,6 +144,20 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         return;
     }
 
+    if node.kind == NodeKind::ND_STMT2 {
+        let node_vec = node.stmts2.clone();
+        let len = node.stmts2_len;
+        let mut i = 0;
+        loop {
+            gen(node_vec[i].as_ref().unwrap(), f, lv, cl);
+            i += 1;
+            if len == i {
+                break;
+            }
+        }
+        return;
+    }
+
     if node.kind == NodeKind::ND_FOR {
         // To prevent name crash, we assign unique
         // (as long as this for scope) label.

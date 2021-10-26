@@ -142,7 +142,7 @@ impl TokenKind {
             TokenKind::IF => "IF",
             TokenKind::ELIF => "ELIF",
             TokenKind::ELSE => "ELSE",
-            TokenKind::FOR=> "FOR",
+            TokenKind::FOR => "FOR",
         }
     }
 }
@@ -165,7 +165,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::IF => write!(f, "IF"),
             TokenKind::ELIF => write!(f, "ELIF"),
             TokenKind::ELSE => write!(f, "ELSE"),
-            TokenKind::FOR=> write!(f, "FOR"),
+            TokenKind::FOR => write!(f, "FOR"),
         }
     }
 }
@@ -211,6 +211,10 @@ fn read_punct(l: &mut Lexer) -> Token {
         return Token::new_token(TokenKind::PUNCT, 0, String::from("("));
     } else if l.expect_and_read(")") {
         return Token::new_token(TokenKind::PUNCT, 0, String::from(")"));
+    } else if l.expect_and_read("{") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("{"));
+    } else if l.expect_and_read("}") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("}"));
     }
     panic!("");
 }
@@ -271,7 +275,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
             // TODO: use hashmap
             let tok_kind: TokenKind;
             match cur_str.as_str() {
-                "for"  => tok_kind = TokenKind::FOR,
+                "for" => tok_kind = TokenKind::FOR,
                 "return" => tok_kind = TokenKind::RETURN,
                 "if" => tok_kind = TokenKind::IF,
                 "else" => {

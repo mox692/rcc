@@ -1,5 +1,20 @@
 use crate::tokenize::{TokenKind, TokenReader};
 
+pub struct Function {
+    pub nodes: Vec<Box<Node>>,
+    // The size at which the code generator lowers the stack.
+    pub lv: usize,
+}
+impl Function {
+    pub fn new(nodes: Vec<Box<Node>>) -> Function {
+        return Function {
+            nodes: nodes,
+            // TODO: calc lv from nodes.
+            lv: 0,
+        };
+    }
+}
+
 #[derive(Clone)]
 pub struct Node {
     pub kind: NodeKind,
@@ -626,14 +641,16 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
     return nodes;
 }
 
-// generate several nodes, and return Vec<Node>.
+// generate several nodes, and return Function.
 // node = program
-pub fn parse(tok: &mut TokenReader) -> Vec<Box<Node>> {
+pub fn parse(tok: &mut TokenReader) -> Function {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
     let mut node: Vec<Box<Node>> = parse_program(tok);
 
-    return node;
+    let function = Function::new(node);
+
+    return function;
 }
 
 pub fn consume_initial_tok(tok: &mut TokenReader) {
@@ -644,7 +661,8 @@ pub fn consume_initial_tok(tok: &mut TokenReader) {
     tok.next();
 }
 
-pub fn debug_nodes(flag: bool, nodes: &Vec<Box<Node>>) {
+pub fn debug_nodes(flag: bool, function: &Function) {
+    let nodes = &function.nodes;
     if !flag {
         return;
     }

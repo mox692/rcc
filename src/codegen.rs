@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 // ref: https://keens.github.io/blog/2018/12/08/rustnomoju_runotsukaikata_2018_editionhan/
+use crate::parse::Function;
 use crate::parse::Node;
 
 struct LocalVariable {
@@ -59,7 +60,9 @@ impl CodeLabel {
     }
 }
 
-pub fn codegen(nodes: &Vec<Box<Node>>) {
+pub fn codegen(function: &Function) {
+    let nodes = &function.nodes;
+
     let mut lv = LocalVariable::new();
     let mut cl = CodeLabel::new();
     let mut f = create_file("./gen.s");

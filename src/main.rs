@@ -32,17 +32,13 @@ fn main() {
 
     let mut tokenReader = NewTokenReader(token);
 
-    let mut nodes = parse(&mut tokenReader);
-    let node_len = nodes.len();
-    if node_len == 0 {
-        panic!("Node Not Found!!")
-    }
+    let mut function = parse(&mut tokenReader);
     // debug node.
-    debug_nodes(debug_flag, nodes.as_ref());
+
+    debug_nodes(debug_flag, &function);
 
     // generate assembly
-    // TODO: consider all nodes.
-    codegen(nodes.as_ref());
+    codegen(&function);
 
     return;
 }

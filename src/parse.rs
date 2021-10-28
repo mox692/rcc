@@ -1,5 +1,11 @@
 use crate::tokenize::{TokenKind, TokenReader};
 
+pub struct Function {
+    pub nodes: Vec<Box<Node>>,
+    // The size at which the code generator lowers the stack.
+    pub lv: usize,
+}
+
 #[derive(Clone)]
 pub struct Node {
     pub kind: NodeKind,

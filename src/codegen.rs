@@ -73,9 +73,17 @@ pub fn codegen(function: &Function) {
     writeln!(f, "pushq %rbp");
     writeln!(f, "movq %rsp, %rbp");
 
-    // TODO: hard code.
-    // 関数をsupportする時に、ここはなんとかする.現在はstackは128byteの固定長.
-    writeln!(f, "sub $128, %rsp");
+    // MEMO: rspを下げるサイズは必ず16の倍数にならないといけないらしいので
+    //       それ用に返す値を少しいじってる.
+    writeln!(
+        f,
+        "sub ${}, %rsp",
+        if function.lv_size % 2 == 0 {
+            8 * function.lv_size
+        } else {
+            (function.lv_size + 1) * 8
+        }
+    );
 
     // 各stmt毎にcodegen.
     // TODO: 将来的には(Nodeというより)Function毎にcodegenをしていくイメージ.

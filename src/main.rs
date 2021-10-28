@@ -1,8 +1,10 @@
 mod codegen;
+mod intermediate_process;
 mod parse;
 mod tokenize;
 
 use codegen::codegen;
+use intermediate_process::intermediate_process;
 use parse::debug_nodes;
 use parse::parse;
 use std::env;
@@ -36,6 +38,8 @@ fn main() {
     // debug node.
 
     debug_nodes(debug_flag, &function);
+
+    function = intermediate_process(function);
 
     // generate assembly
     codegen(&function);

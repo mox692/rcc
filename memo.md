@@ -19,8 +19,33 @@
 
 
 ### TODO
-* local valの再代入処理.
-  * 同じシンボルに対する再代入が今はできなくてる.
+* 変数scopeが何やらおかしい.
+  * block
+    * 下記はとりあえず落ちた
+    * scope関連は、さしあたりの目標はfunction scopeにしたい.
+    * function作る時にまた考える.
+      
+```
+a = 4;
+b=3;
+c=1;
+if(a<2){
+    b=3;
+    c = 2;
+    if(a > 2){
+        3;
+    }
+} else if (a == 3) {
+    return 32;
+} else {
+    c = 2;
+    if(c > a) {
+        return 22;
+    } else {
+        a = c+b;
+        return a;
+    }
+}
 * Error処理
   * parser, codegen, tokenizerでそれぞれ違ってくるかも.
 * for文の最後の構文が、(再代入できない故)exprになっている
@@ -49,5 +74,5 @@ assign = &ident ( "=" equality )*
 expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
-unary = &num | &ident
+unary = &num | &ident | &ident "(" ")"
 ```

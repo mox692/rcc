@@ -25,6 +25,8 @@ pub struct Node {
     // for stmts2
     pub stmts2: Vec<Option<Box<Node>>>,
     pub stmts2_len: usize,
+
+    pub fn_name: String,
 }
 impl Default for Node {
     fn default() -> Self {
@@ -46,6 +48,7 @@ impl Default for Node {
             for_node_stmts: None,
             stmts2: Vec::new(),
             stmts2_len: 0,
+            fn_name: String::new(),
         };
     }
 }
@@ -74,6 +77,7 @@ pub enum NodeKind {
     ND_IFCOND,
     ND_FOR,
     ND_STMT2,
+    ND_FNCALL,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -101,6 +105,7 @@ impl NodeKind {
             NodeKind::ND_IFCOND => "ND_IFCOND",
             NodeKind::ND_FOR => "ND_FOR",
             NodeKind::ND_STMT2 => "ND_STMT2",
+            &NodeKind::ND_FNCALL => "ND_FNCALL",
             _ => {
                 panic!("Not impl NodeKind::to_string")
             }
@@ -141,6 +146,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_IFCOND => write!(f, "ND_IFCOND"),
             NodeKind::ND_FOR => write!(f, "ND_FOR"),
             NodeKind::ND_STMT2 => write!(f, "ND_STMT2"),
+            NodeKind::ND_FNCALL => write!(f, "ND_FNCALL"),
             _ => {
                 panic!("Invalid Node Kind.")
             }
@@ -239,12 +245,40 @@ fn gen_if_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> 
     }));
 }
 
-// nary = &num | &ident
+fn gen_fn_call_node(fn_name: String) -> Option<Box<Node>> {
+    return Some(Box::new(Node {
+        kind: NodeKind::ND_FNCALL,
+        fn_name: fn_name,
+        ..Default::default()
+    }));
+}
+
+fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
+    // TODO: 引数を読む処理.
+    // ...
+    // 今はfoo()という、引数なしの関数しか許していない.
+
+    if tok.cur_tok().char != ")" {
+        tok.error(String::from("expect `)`, but not."));
+        panic!("");
+    }
+    // `)`の次のtokenを指すように.
+    tok.next();
+    return gen_fn_call_node(fn_name);
+}
+
+// unary = &num | &ident | &ident "(" ")"
 fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().kind == TokenKind::NUM {
         return gen_num_node(tok);
     } else if tok.cur_tok().kind == TokenKind::IDENT {
-        return gen_ident_node(tok);
+        if tok.get_next_tok().char == "(" {
+            // 呼び出し先で、`(`の次を読める様に.
+            let fn_name = tok.cur_tok().char;
+            return parse_fn_call(tok.next_nth_tok(2), fn_name);
+        } else {
+            return gen_ident_node(tok);
+        }
     } else {
         tok.error(String::from("expect TokenKind::IDENT, but not."));
         panic!("");
@@ -689,6 +723,10 @@ pub fn read_node(node: &Node, depth: &mut usize) {
         return;
     }
 
+    if node.kind == NodeKind::ND_FNCALL {
+        return;
+    }
+
     /*
         read binary_node.
     */
@@ -706,6 +744,9 @@ fn print_node_info(node: &Node, depth: &mut usize) {
         }
         NodeKind::ND_IDENT => {
             println!("kind: {}, str: {}", node.kind, node.str)
+        }
+        NodeKind::ND_FNCALL => {
+            println!("kind: {}, fn_name: {}", node.kind, node.fn_name)
         }
         _ => {
             println!("kind: {}", node.kind);

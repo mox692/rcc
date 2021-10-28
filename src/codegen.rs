@@ -120,6 +120,13 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         writeln!(f, "push %rax");
         return;
     }
+    if node.kind == NodeKind::ND_FNCALL {
+        // TODO: まだ関数呼び出しができない.
+        //       関数呼び出しを見つけると、codegeneratorは
+        //       stackに0をpushする.(どんな関数呼び出しも0として評価される.)
+        writeln!(f, "push $0");
+        return;
+    }
 
     /*
         gen from binary node.

@@ -321,6 +321,17 @@ impl TokenReader {
         self.next();
         return self;
     }
+    pub fn next_nth_tok(&mut self, n: usize) -> &mut Self {
+        let mut i = 0;
+        loop {
+            if i == n {
+                break;
+            }
+            self.next();
+            i += 1;
+        }
+        return self;
+    }
     pub fn get_next_tok(&self) -> Token {
         return self.tokens[self.cur + 1 as usize].clone();
     }

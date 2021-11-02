@@ -1,16 +1,17 @@
 use crate::tokenize::{TokenKind, TokenReader};
 
+#[derive(Clone)]
 pub struct Function {
     pub nodes: Vec<Box<Node>>,
     // The size at which the code generator lowers the stack.
-    pub lv: usize,
+    pub lv_size: usize,
 }
 impl Function {
     pub fn new(nodes: Vec<Box<Node>>) -> Function {
         return Function {
             nodes: nodes,
             // TODO: calc lv from nodes.
-            lv: 0,
+            lv_size: 0,
         };
     }
 }
@@ -646,9 +647,9 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
 pub fn parse(tok: &mut TokenReader) -> Function {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
-    let mut node: Vec<Box<Node>> = parse_program(tok);
+    let mut nodes: Vec<Box<Node>> = parse_program(tok);
 
-    let function = Function::new(node);
+    let function = Function::new(nodes);
 
     return function;
 }
@@ -727,6 +728,12 @@ pub fn read_node(node: &Node, depth: &mut usize) {
         return;
     }
 
+    if node.kind == NodeKind::ND_ELSE {
+        *depth += 1;
+        read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+        return;
+    }
     if node.kind == NodeKind::ND_STMT2 {
         *depth += 1;
         let mut i = 0;

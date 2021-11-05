@@ -162,9 +162,9 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         return;
     }
 
-    if node.kind == NodeKind::ND_STMT2 {
-        let node_vec = node.stmts2.clone();
-        let len = node.stmts2_len;
+    if node.kind == NodeKind::ND_BLOCK {
+        let node_vec = node.block_stmts.clone();
+        let len = node.block_stmts_len;
         let mut i = 0;
         loop {
             gen(node_vec[i].as_ref().unwrap(), f, lv, cl);
@@ -173,6 +173,11 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
                 break;
             }
         }
+        return;
+    }
+
+    if node.kind == NodeKind::ND_STMT2 {
+        gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
         return;
     }
 

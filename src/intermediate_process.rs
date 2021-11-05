@@ -112,15 +112,20 @@ fn count_node_localval_size(
         return *size;
     }
 
-    if node.kind == NodeKind::ND_STMT2 {
+    if node.kind == NodeKind::ND_BLOCK {
         let mut i = 0;
         loop {
-            if i == node.stmts2_len {
+            if i == node.block_stmts_len {
                 break;
             }
-            count_node_localval_size(node.stmts2[i].as_ref().unwrap(), val_tbl, size);
+            count_node_localval_size(node.block_stmts[i].as_ref().unwrap(), val_tbl, size);
             i += 1;
         }
+        return *size;
+    }
+
+    if node.kind == NodeKind::ND_STMT2 {
+        count_node_localval_size(node.l.as_ref().unwrap(), val_tbl, size);
         return *size;
     }
 

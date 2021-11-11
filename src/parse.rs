@@ -43,6 +43,9 @@ pub struct Node {
     // for block
     pub block_stmts: Vec<Option<Box<Node>>>,
     pub block_stmts_len: usize,
+
+    // for creating block_str
+    pub block_str: String,
 }
 impl Default for Node {
     fn default() -> Self {
@@ -65,6 +68,7 @@ impl Default for Node {
             block_stmts: Vec::new(),
             block_stmts_len: 0,
             fn_name: String::new(),
+            block_str: String::new(),
         };
     }
 }

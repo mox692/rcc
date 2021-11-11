@@ -1,3 +1,6 @@
+#![feature(map_try_insert)]
+#![feature(core_panic)]
+
 mod codegen;
 mod intermediate_process;
 mod parse;

@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::collections::HashMap;
 
 use crate::parse::Function;
 use crate::parse::Node;
@@ -32,7 +32,7 @@ impl FunctionVariableTale {
 // (将来的には)最適化的なことを行う.
 pub fn intermediate_process(mut f: Function) -> Function {
     set_lvsize_to_function(&mut f);
-    set_block_str_and_create_localval_table(&mut f);
+    f = set_block_str_and_create_localval_table(f);
     return f;
 }
 
@@ -142,21 +142,69 @@ fn count_node_localval_size(
     return *size;
 }
 
-fn set_block_str_and_create_localval_table(f: &mut Function) {
-    let mut index: Vec<usize> = vec![0; 10];
-    let mut depth: usize = 0;
-    let mut cur_str = String::new();
-    for node in f.nodes.clone() {
-        read_node(node.as_ref(), &mut index, &mut depth, &mut cur_str)
+fn set_block_str_and_create_localval_table(f: Function) -> Function {
+    let mut nodes = f.nodes.clone();
+    let mut arg = ReadNodeArgs::new();
+    let mut i = 0;
+    loop {
+        let mut node = nodes[i].clone();
+        read_node(&mut node, &mut arg);
+        // 書き換わったnodeを、元のnodeのvectorに書き戻す.
+        nodes[i] = node;
+        i += 1;
+        if i == nodes.len() {
+            for (k, v) in &*arg.ident_dir {
+                for (kk, vv) in &*v {
+                    println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
+                }
+            }
+            break;
+        }
     }
-    return;
+    return Function {
+        lv_size: f.lv_size,
+        nodes: nodes,
+    };
 }
 
-fn read_node(node: &Node, index: &mut Vec<usize>, depth: &mut usize, cur_str: &mut String) {
+struct ReadNodeArgs {
+    index: Vec<usize>,
+    depth: usize,
+    cur_str: String,
+    // <usize(blockの階層), Hashmap(ident table)>
+    ident_dir: Box<HashMap<usize, HashMap<String, String>>>,
+}
+impl ReadNodeArgs {
+    fn new() -> Self {
+        return ReadNodeArgs {
+            index: vec![0; 10],
+            depth: 0,
+            cur_str: String::new(),
+            ident_dir: Box::new(HashMap::new()),
+        };
+    }
+}
+
+fn read_node(node: &mut Box<Node>, arg: &mut ReadNodeArgs) {
     //
     // Terminal symbol.
     //
     if node.kind == NodeKind::ND_IDENT {
+        // MEMO: そのidentが作成されたblockを示す、block_strを入れる.
+        node.block_str = arg.cur_str.clone();
+
+        // TODO: ここのident tableにblock_strを入れる処理、method化したい.(ここの位置にあると見辛い)
+
+        // intmapのcloneを作成
+        let mut ident_table = match arg.ident_dir.get(&arg.depth) {
+            Some(ident_table) => ident_table.clone(),
+            // このdepthでの初めてのident_table entryを作る時
+            None => HashMap::new(),
+        };
+        // cloneにこのidentnodeの識別子の情報を入れる.
+        ident_table.insert(node.block_str.clone(), String::from(node.str.clone()));
+
+        arg.ident_dir.insert(arg.depth, ident_table);
         return;
     }
     if node.kind == NodeKind::ND_NUM {
@@ -168,53 +216,38 @@ fn read_node(node: &Node, index: &mut Vec<usize>, depth: &mut usize, cur_str: &m
         || node.kind == NodeKind::ND_STMT
         || node.kind == NodeKind::ND_RETURN
     {
-        read_node(node.l.as_ref().unwrap(), index, depth, cur_str);
+        read_node(&mut node.l.as_mut().unwrap(), arg);
         return;
     }
 
     // for for_stmt
     if node.kind == NodeKind::ND_FOR {
-        read_node(
-            node.for_node_first_assign.as_ref().unwrap(),
-            index,
-            depth,
-            cur_str,
-        );
-        read_node(
-            node.for_node_second_condition.as_ref().unwrap(),
-            index,
-            depth,
-            cur_str,
-        );
-        read_node(
-            node.for_node_third_expr.as_ref().unwrap(),
-            index,
-            depth,
-            cur_str,
-        );
-        read_node(node.for_node_stmts.as_ref().unwrap(), index, depth, cur_str);
+        read_node(&mut node.for_node_first_assign.as_mut().unwrap(), arg);
+        read_node(&mut node.for_node_second_condition.as_mut().unwrap(), arg);
+        read_node(&mut node.for_node_third_expr.as_mut().unwrap(), arg);
+        read_node(&mut node.for_node_stmts.as_mut().unwrap(), arg);
         return;
     }
 
     // for if_stmt
     if node.kind == NodeKind::ND_IFSTMT {
-        read_node(node.if_node.as_ref().unwrap(), index, depth, cur_str);
+        read_node(&mut node.if_node.as_mut().unwrap(), arg);
         if node.elsif_node.is_some() {
-            read_node(node.elsif_node.as_ref().unwrap(), index, depth, cur_str);
+            read_node(&mut node.elsif_node.as_mut().unwrap(), arg);
         }
         if node.else_node.is_some() {
-            read_node(node.else_node.as_ref().unwrap(), index, depth, cur_str);
+            read_node(&mut node.else_node.as_mut().unwrap(), arg);
         }
         return;
     }
 
     if node.kind == NodeKind::ND_IFCOND {
-        read_node(node.l.as_ref().unwrap(), index, depth, cur_str);
+        read_node(&mut node.l.as_mut().unwrap(), arg);
         return;
     }
 
     if node.kind == NodeKind::ND_ELSE {
-        read_node(node.l.as_ref().unwrap(), index, depth, cur_str);
+        read_node(&mut node.l.as_mut().unwrap(), arg);
         return;
     }
 
@@ -245,26 +278,28 @@ fn read_node(node: &Node, index: &mut Vec<usize>, depth: &mut usize, cur_str: &m
             }
         */
 
-        *depth += 1; // depthを1に
-        index[*depth] += 1; // depth1のindexを1に
-        let _ = block_str_from_index(depth.clone(), index);
+        arg.depth += 1;
+        // *depth += 1; // depthを1に
+        arg.index[arg.depth] += 1;
+        // index[*depth] += 1; // depth1のindexを1に
+        arg.cur_str = block_str_from_index(arg.depth.clone(), &arg.index);
         loop {
             if i == node.block_stmts_len {
                 break;
             }
-            read_node(node.block_stmts[i].as_ref().unwrap(), index, depth, cur_str);
+            read_node(&mut node.block_stmts[i].as_mut().unwrap(), arg);
             i += 1;
         }
         // depth以下の情報は破棄する.
-        for i in (*depth + 1)..10 {
-            index[i] = 0;
+        for i in (arg.depth + 1)..10 {
+            arg.index[i] = 0;
         }
-        *depth -= 1;
+        arg.depth -= 1;
         return;
     }
 
     if node.kind == NodeKind::ND_STMT2 {
-        read_node(node.l.as_ref().unwrap(), index, depth, cur_str);
+        read_node(&mut node.l.as_mut().unwrap(), arg);
         return;
     }
 
@@ -275,8 +310,8 @@ fn read_node(node: &Node, index: &mut Vec<usize>, depth: &mut usize, cur_str: &m
     /*
         read binary_node.
     */
-    read_node(node.l.as_ref().unwrap(), index, depth, cur_str);
-    read_node(node.r.as_ref().unwrap(), index, depth, cur_str);
+    read_node(&mut node.l.as_mut().unwrap(), arg);
+    read_node(&mut node.r.as_mut().unwrap(), arg);
     return;
 }
 
@@ -285,6 +320,5 @@ fn block_str_from_index(depth: usize, index: &Vec<usize>) -> String {
     for i in 1..=depth {
         base.push_str(format!("_{}", index[i]).as_str())
     }
-    println!("block str: {}", base);
     return base;
 }

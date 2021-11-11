@@ -38,6 +38,13 @@
   * あと、同じblock内で変数がhitしなかった際の、1つ上のnodeを探す際とかも、tableになっていないと意味がない気がする.
     * これはcodegen側でやるtaskかも.
 
+11/11
+* read_nodeをリファクタして、引数等をまとめたstructを作る.
+* ↑のstruct にcur_blockという、現在読んでるblock strをいれるfieldを作る
+* ident_nodeがきた時に、block_strを各処理を追加
+  * block node -> block node strを更新
+  * idnet_node -> nodeにstrを書き込み、関数内でglobalなidnet tableへの書き込み.
+ここまでやると、
 ### TODO
 * 変数scopeが何やらおかしい.
   * block

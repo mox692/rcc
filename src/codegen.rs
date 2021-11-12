@@ -60,7 +60,13 @@ impl CodeLabel {
     }
 }
 
-pub fn codegen(function: &Function) {
+pub fn codegen(functions: Vec<Function>) {
+    for f in functions.iter() {
+        codegen_func(f.clone());
+    }
+}
+
+pub fn codegen_func(function: Function) {
     let nodes = &function.nodes;
 
     let mut lv = LocalVariable::new();

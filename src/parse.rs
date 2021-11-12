@@ -659,14 +659,17 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
 
 // generate several nodes, and return Function.
 // node = program
-pub fn parse(tok: &mut TokenReader) -> Function {
+pub fn parse(tok: &mut TokenReader) -> Vec<Function> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
     let mut nodes: Vec<Box<Node>> = parse_program(tok);
 
     let function = Function::new(nodes);
 
-    return function;
+    // TODO: 文法を変えて、複数のfunctionをparseできるように.
+    //       今は手動でVec<Function>を返すようにしてる
+    let fv = vec![function];
+    return fv;
 }
 
 pub fn consume_initial_tok(tok: &mut TokenReader) {

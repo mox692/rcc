@@ -30,10 +30,17 @@ impl FunctionVariableTale {
 
 // Functionに対して、local変数のカウントを行ったり、
 // (将来的には)最適化的なことを行う.
-pub fn intermediate_process(mut f: Function) -> Function {
-    set_lvsize_to_function(&mut f);
-    f = set_block_str_and_create_localval_table(f);
-    return f;
+pub fn intermediate_process(mut fvec: Vec<Function>) -> Vec<Function> {
+    let mut fvec_after = vec![];
+    for f in fvec.iter() {
+        let mut f_clone = f.clone();
+        // 関数のstack_sizeを計測.
+        set_lvsize_to_function(&mut f_clone);
+        // 関数のlocal変数表の作成.
+        f_clone = set_block_str_and_create_localval_table(f_clone);
+        fvec_after.push(f_clone);
+    }
+    return fvec_after;
 }
 
 fn set_lvsize_to_function(f: &mut Function) {
@@ -155,7 +162,7 @@ fn set_block_str_and_create_localval_table(f: Function) -> Function {
         if i == nodes.len() {
             for (k, v) in &*arg.ident_dir {
                 for (kk, vv) in &*v {
-                    println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
+                    // println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
                 }
             }
             break;

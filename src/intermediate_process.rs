@@ -160,9 +160,9 @@ fn set_block_str_and_create_localval_table(f: Function) -> Function {
         nodes[i] = node;
         i += 1;
         if i == nodes.len() {
-            for (k, v) in &*arg.ident_dir {
+            for (k, v) in &*arg.ident_dir.ident_dir {
                 for (kk, vv) in &*v {
-                    // println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
+                    println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
                 }
             }
             break;
@@ -179,7 +179,7 @@ struct ReadNodeArgs {
     depth: usize,
     cur_str: String,
     // <usize(blockの階層), Hashmap(ident table)>
-    ident_dir: Box<HashMap<usize, HashMap<String, String>>>,
+    ident_dir: IdentDir,
 }
 impl ReadNodeArgs {
     fn new() -> Self {
@@ -187,8 +187,31 @@ impl ReadNodeArgs {
             index: vec![0; 10],
             depth: 0,
             cur_str: String::new(),
+            ident_dir: IdentDir::new(),
+        };
+    }
+}
+
+struct IdentDir {
+    ident_dir: Box<HashMap<usize, HashMap<String, String>>>,
+}
+impl IdentDir {
+    fn new() -> Self {
+        return Self {
             ident_dir: Box::new(HashMap::new()),
         };
+    }
+    fn insert_nth_depth_identtable(&mut self, n: usize, ident_table: (String, String)) {
+        let mut nth_ident_table = self.get_nth_depth_identtable_or(n);
+        nth_ident_table.insert(ident_table.0, ident_table.1);
+        self.ident_dir.insert(n, nth_ident_table);
+    }
+    fn get_nth_depth_identtable_or(&self, n: usize) -> HashMap<String, String> {
+        let nth_ident_table = match self.ident_dir.get(&n) {
+            Some(t) => t.clone(),
+            _ => HashMap::new(),
+        };
+        return nth_ident_table;
     }
 }
 
@@ -202,16 +225,19 @@ fn read_node(node: &mut Box<Node>, arg: &mut ReadNodeArgs) {
 
         // TODO: ここのident tableにblock_strを入れる処理、method化したい.(ここの位置にあると見辛い)
 
-        // intmapのcloneを作成
-        let mut ident_table = match arg.ident_dir.get(&arg.depth) {
-            Some(ident_table) => ident_table.clone(),
-            // このdepthでの初めてのident_table entryを作る時
-            None => HashMap::new(),
-        };
-        // cloneにこのidentnodeの識別子の情報を入れる.
-        ident_table.insert(node.block_str.clone(), String::from(node.str.clone()));
+        // // intmapのcloneを作成
+        // let mut ident_table = match arg.ident_dir.get(&arg.depth) {
+        //     Some(ident_table) => ident_table.clone(),
+        //     // このdepthでの初めてのident_table entryを作る時
+        //     None => HashMap::new(),
+        // };
+        // // cloneにこのidentnodeの識別子の情報を入れる.
+        // ident_table.insert(node.block_str.clone(), String::from(node.str.clone()));
 
-        arg.ident_dir.insert(arg.depth, ident_table);
+        arg.ident_dir.insert_nth_depth_identtable(
+            arg.depth,
+            (node.block_str.clone(), String::from(node.str.clone())),
+        );
         return;
     }
     if node.kind == NodeKind::ND_NUM {

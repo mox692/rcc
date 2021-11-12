@@ -160,9 +160,9 @@ fn set_block_str_and_create_localval_table(f: Function) -> Function {
         nodes[i] = node;
         i += 1;
         if i == nodes.len() {
-            for (k, v) in &*arg.ident_dir.ident_dir {
+            for (k, v) in &*arg.ident_dir.dir {
                 for (kk, vv) in &*v {
-                    println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
+                    // println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
                 }
             }
             break;
@@ -192,22 +192,23 @@ impl ReadNodeArgs {
     }
 }
 
-struct IdentDir {
-    ident_dir: Box<HashMap<usize, HashMap<String, String>>>,
+// Funcion内のsymbolを格納するstruct.
+pub struct IdentDir {
+    pub dir: Box<HashMap<usize, HashMap<String, String>>>,
 }
 impl IdentDir {
-    fn new() -> Self {
+    pub fn new() -> Self {
         return Self {
-            ident_dir: Box::new(HashMap::new()),
+            dir: Box::new(HashMap::new()),
         };
     }
-    fn insert_nth_depth_identtable(&mut self, n: usize, ident_table: (String, String)) {
+    pub fn insert_nth_depth_identtable(&mut self, n: usize, ident_table: (String, String)) {
         let mut nth_ident_table = self.get_nth_depth_identtable_or(n);
         nth_ident_table.insert(ident_table.0, ident_table.1);
-        self.ident_dir.insert(n, nth_ident_table);
+        self.dir.insert(n, nth_ident_table);
     }
-    fn get_nth_depth_identtable_or(&self, n: usize) -> HashMap<String, String> {
-        let nth_ident_table = match self.ident_dir.get(&n) {
+    pub fn get_nth_depth_identtable_or(&self, n: usize) -> HashMap<String, String> {
+        let nth_ident_table = match self.dir.get(&n) {
             Some(t) => t.clone(),
             _ => HashMap::new(),
         };

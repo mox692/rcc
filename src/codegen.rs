@@ -7,6 +7,36 @@ use std::io::prelude::*;
 use crate::parse::Function;
 use crate::parse::Node;
 
+struct FunctionLocalVariable {
+    // block_str: offset
+    hashmap_blcstr_offset: HashMap<String, usize>,
+
+    // current stack size
+    size: usize,
+}
+impl FunctionLocalVariable {
+    fn new() -> Self {
+        return Self {
+            hashmap_blcstr_offset: HashMap::new(),
+            size: 0,
+        };
+    }
+    fn insert(&mut self, blc_str: String, offset: usize) {
+        self.hashmap_blcstr_offset.insert(blc_str, offset);
+    }
+    fn new_val_offset(&mut self, block_str: String) -> usize {
+        self.size += 8;
+        self.insert(block_str, self.size);
+        return self.size;
+    }
+    fn get_val_offset(&self, blcstr: String) -> usize {
+        self.hashmap_blcstr_offset
+            .get(&blcstr)
+            .unwrap_or_else(|| panic!("unknown symbol!"))
+            .clone()
+    }
+}
+
 struct LocalVariable {
     pub count: usize,
     pub local_vals: HashMap<String, usize>,
@@ -69,7 +99,8 @@ pub fn codegen(functions: Vec<Function>) {
 pub fn codegen_func(function: Function) {
     let nodes = &function.nodes;
 
-    let mut lv = LocalVariable::new();
+    // let mut lv = LocalVariable::new();
+    let mut lv = FunctionLocalVariable::new();
     let mut cl = CodeLabel::new();
     let mut f = create_file("./gen.s");
     // put start up.
@@ -105,7 +136,7 @@ pub fn codegen_func(function: Function) {
 }
 
 // 引数で渡されたNodeを展開して、その評価結果をstack topにpushする.
-fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
+fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeLabel) {
     /*
         gen from unary node.
     */
@@ -131,7 +162,11 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        writeln!(f, "lea -{}(%rbp), %rax", lv.get_offset(node.str.clone()));
+        writeln!(
+            f,
+            "lea -{}(%rbp), %rax",
+            lv.get_val_offset(format!("{}{}", node.str, node.block_str.clone()))
+        );
         // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
         writeln!(f, "push %rax");
@@ -157,7 +192,11 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         writeln!(
             f,
             "lea -{}(%rbp), %rax",
-            lv.new_offset(node.l.as_ref().unwrap().str.clone())
+            lv.new_val_offset(format!(
+                "{}{}",
+                node.l.as_ref().unwrap().str.clone(),
+                node.l.as_ref().unwrap().block_str.clone()
+            ))
         );
         writeln!(f, "push %rax");
 

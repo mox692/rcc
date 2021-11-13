@@ -45,6 +45,13 @@
   * block node -> block node strを更新
   * idnet_node -> nodeにstrを書き込み、関数内でglobalなidnet tableへの書き込み.
 ここまでやると、
+
+11/13
+* block内で同じsymbol名を使えないようにした.
+  * nextとしては
+    * int で、変数宣言の概念を導入
+    * (最上位のblockじゃない時に、)同階層にsymbolがなくても、上のblockを順にsearchしていく機能を付け足す.
+
 ### TODO
 * 変数scopeが何やらおかしい.
   * block

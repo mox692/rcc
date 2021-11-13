@@ -82,16 +82,16 @@ test "for (a = 2;  10 < 3; 3+2;)3; for(c = 0; c > 10; 3;) d = 3; 2; return d;" 3
 # block
 test "{3; 3;3; } return 3;" 3
 test "if(3>2){a=3;if(a > 2){3;} }" 3
-test "
-a=44;
-e = 3;
-if(a<2){
-    b=3;
-    c = 2;
-} elseaa {
-    d = e;
-    return d;
-}" 4
+# test "
+# a=44;
+# e = 3;
+# if(a<2){
+#     b=3;
+#     c = 2;
+# } else {
+#     d = e;
+#     return d;
+# }" 4
 
 # block scope
 
@@ -121,7 +121,7 @@ if(3>2)
 {
     d = 3;
     3;
-}"
+}" 3
 # # function token
 # test "a = 3; foo(); return a;" 3 
 # test "return 33 + bar();" 33

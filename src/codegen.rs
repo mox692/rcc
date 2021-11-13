@@ -8,8 +8,8 @@ use crate::parse::Function;
 use crate::parse::Node;
 
 struct FunctionLocalVariable {
-    // block_str: offset
-    hashmap_blcstr_offset: HashMap<String, usize>,
+    // ident_id: offset
+    ident_id_map: HashMap<String, usize>,
 
     // current stack size
     size: usize,
@@ -17,61 +17,52 @@ struct FunctionLocalVariable {
 impl FunctionLocalVariable {
     fn new() -> Self {
         return Self {
-            hashmap_blcstr_offset: HashMap::new(),
+            ident_id_map: HashMap::new(),
             size: 0,
         };
     }
     fn insert(&mut self, blc_str: String, offset: usize) {
-        self.hashmap_blcstr_offset.insert(blc_str, offset);
+        self.ident_id_map.insert(blc_str, offset);
+    }
+    // すでにkeyが存在していたら、Errを返す
+    // fn try_insert(&mut self, blc_str: String, offset: usize) -> Result<usize, OccupiedError> {
+    //     self.ident_id_map.try_insert(blc_str, offset)
+    // }
+    fn get_from_ident_id_map(&self, ident_id: String) -> Option<usize> {
+        match self.ident_id_map.get(&ident_id) {
+            None => None,
+            Some(v) => Some(v.clone()),
+        }
     }
     fn new_val_offset(&mut self, block_str: String) -> usize {
         self.size += 8;
         self.insert(block_str, self.size);
         return self.size;
     }
-    fn get_val_offset(&self, blcstr: String) -> usize {
-        self.hashmap_blcstr_offset
-            .get(&blcstr)
-            .unwrap_or_else(|| panic!("unknown symbol!"))
-            .clone()
+    fn blcstr_to_identid(&self, symbol: String, blcstr: String) -> String {
+        return format!("{}{}", symbol, blcstr);
     }
-}
-
-struct LocalVariable {
-    pub count: usize,
-    pub local_vals: HashMap<String, usize>,
-}
-impl LocalVariable {
-    fn new() -> LocalVariable {
-        return LocalVariable {
-            count: 0,
-            local_vals: HashMap::new(),
-        };
-    }
-    fn register_symbol(&mut self, symbol: String, offset: usize) {
-        self.local_vals.insert(symbol, offset);
-        return;
-    }
-    fn incre_count(&mut self) {
-        self.count += 1;
-    }
-    // new_offset gets symbol name given from codegenarator,
-    // and returns offset from rbp.
-    fn new_offset(&mut self, symbol: String) -> usize {
-        let new_offset = (self.count + 1) * 8;
-        self.incre_count();
-        self.register_symbol(symbol, new_offset);
-        return new_offset;
-    }
-    fn get_offset(&self, symbol: String) -> usize {
-        match self.local_vals.get::<String>(&symbol) {
+    // block_strとsymbolから、idnet_idを作成する.
+    // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
+    // Errを返す.
+    fn try_new_val_offset(&mut self, symbol: String, blcstr: String) -> Result<usize, &str> {
+        // すでに存在するかcheck
+        let ident_id = self.blcstr_to_identid(symbol, blcstr.clone());
+        match self.get_from_ident_id_map(ident_id.clone()) {
+            Some(_) => Err("Already Exist Symbol"),
             None => {
-                panic!("cannot find local val.")
-            }
-            Some(offset) => {
-                return *offset;
+                self.ident_id_map.insert(ident_id.clone(), self.size + 8);
+                self.size += 8;
+                return Ok(self.size);
             }
         }
+    }
+    fn get_val_offset(&self, symbol: String, blcstr: String) -> usize {
+        let ident_id = self.blcstr_to_identid(symbol, blcstr);
+        self.ident_id_map
+            .get(&ident_id)
+            .unwrap_or_else(|| panic!("unknown symbol!"))
+            .clone()
     }
 }
 
@@ -165,7 +156,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         writeln!(
             f,
             "lea -{}(%rbp), %rax",
-            lv.get_val_offset(format!("{}{}", node.str, node.block_str.clone()))
+            lv.get_val_offset(node.str.clone(), node.block_str.clone())
         );
         // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
@@ -187,17 +178,16 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     //       assignで終了するような入力ソースコードを受け取ると、
     //       変な終了コードになりそう.(まあ、さしあたりはそんなことは気にしない.)
     if node.kind == NodeKind::ND_ASSIGN {
+        let offset = match lv.try_new_val_offset(
+            node.l.as_ref().unwrap().str.clone(),
+            node.l.as_ref().unwrap().block_str.clone(),
+        ) {
+            Ok(v) => v,
+            Err(_) => panic!("Symbol duplicated!!"),
+        };
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
-        writeln!(
-            f,
-            "lea -{}(%rbp), %rax",
-            lv.new_val_offset(format!(
-                "{}{}",
-                node.l.as_ref().unwrap().str.clone(),
-                node.l.as_ref().unwrap().block_str.clone()
-            ))
-        );
+        writeln!(f, "lea -{}(%rbp), %rax", offset);
         writeln!(f, "push %rax");
 
         gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);

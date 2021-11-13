@@ -38,11 +38,14 @@ pub struct Node {
     pub for_node_third_expr: Option<Box<Node>>,
     pub for_node_stmts: Option<Box<Node>>,
 
-    // for stmts2
-    pub stmts2: Vec<Option<Box<Node>>>,
-    pub stmts2_len: usize,
-
     pub fn_name: String,
+
+    // for block
+    pub block_stmts: Vec<Option<Box<Node>>>,
+    pub block_stmts_len: usize,
+
+    // for creating block_str
+    pub block_str: String,
 }
 impl Default for Node {
     fn default() -> Self {
@@ -62,9 +65,10 @@ impl Default for Node {
             for_node_second_condition: None,
             for_node_third_expr: None,
             for_node_stmts: None,
-            stmts2: Vec::new(),
-            stmts2_len: 0,
+            block_stmts: Vec::new(),
+            block_stmts_len: 0,
             fn_name: String::new(),
+            block_str: String::new(),
         };
     }
 }
@@ -94,6 +98,7 @@ pub enum NodeKind {
     ND_FOR,
     ND_STMT2,
     ND_FNCALL,
+    ND_BLOCK,
 }
 impl NodeKind {
     fn to_string(&self) -> &str {
@@ -121,6 +126,7 @@ impl NodeKind {
             NodeKind::ND_IFCOND => "ND_IFCOND",
             NodeKind::ND_FOR => "ND_FOR",
             NodeKind::ND_STMT2 => "ND_STMT2",
+            NodeKind::ND_BLOCK => "ND_BLOCK",
             &NodeKind::ND_FNCALL => "ND_FNCALL",
             _ => {
                 panic!("Not impl NodeKind::to_string")
@@ -162,6 +168,7 @@ impl std::fmt::Display for NodeKind {
             NodeKind::ND_IFCOND => write!(f, "ND_IFCOND"),
             NodeKind::ND_FOR => write!(f, "ND_FOR"),
             NodeKind::ND_STMT2 => write!(f, "ND_STMT2"),
+            NodeKind::ND_BLOCK => write!(f, "ND_BLOCK"),
             NodeKind::ND_FNCALL => write!(f, "ND_FNCALL"),
             _ => {
                 panic!("Invalid Node Kind.")
@@ -580,33 +587,41 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     panic!("");
 }
 
-// stmts2 = "{" stmts* "}" | stmt
-fn parse_stmts2(tok: &mut TokenReader) -> Option<Box<Node>> {
+// block = "{" stmts* "}"
+fn parse_block(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut stmts: Vec<Option<Box<Node>>> = Vec::new();
     let mut node = Box::new(Node {
+        kind: NodeKind::ND_BLOCK,
         ..Default::default()
     });
-
-    let mut stmts: Vec<Option<Box<Node>>> = Vec::new();
-    if tok.cur_tok().char == "{" {
-        let mut c = 0;
-        tok.next();
-        loop {
-            // 2
-            let _node = parse_stmts(tok);
-            stmts.push(_node);
-            c += 1;
-            if tok.cur_tok().char == "}" {
-                node.kind = NodeKind::ND_STMT2;
-                node.stmts2 = stmts;
-                node.stmts2_len = c;
-                tok.next();
-                return Some(node);
-            }
+    let mut c = 0;
+    loop {
+        let _node = parse_stmts(tok);
+        stmts.push(_node);
+        c += 1;
+        if tok.cur_tok().char == "}" {
+            node.block_stmts = stmts;
+            node.block_stmts_len = c;
+            tok.next();
+            return Some(node);
         }
     }
+}
+
+// stmts2 = block | stmt
+fn parse_stmts2(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let mut node = Box::new(Node {
+        kind: NodeKind::ND_STMT2,
+        ..Default::default()
+    });
+    if tok.cur_tok().char == "{" {
+        let _node = parse_block(tok.next_tok());
+        node.l = _node;
+        return Some(node);
+    }
     // one stmt.
-    node = parse_stmt(tok).unwrap();
-    node.kind = NodeKind::ND_STMT;
+    let _node = parse_stmt(tok);
+    node.l = _node;
     return Some(node);
 }
 
@@ -644,14 +659,17 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
 
 // generate several nodes, and return Function.
 // node = program
-pub fn parse(tok: &mut TokenReader) -> Function {
+pub fn parse(tok: &mut TokenReader) -> Vec<Function> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
     let mut nodes: Vec<Box<Node>> = parse_program(tok);
 
     let function = Function::new(nodes);
 
-    return function;
+    // TODO: 文法を変えて、複数のfunctionをparseできるように.
+    //       今は手動でVec<Function>を返すようにしてる
+    let fv = vec![function];
+    return fv;
 }
 
 pub fn consume_initial_tok(tok: &mut TokenReader) {
@@ -738,10 +756,10 @@ pub fn read_node(node: &Node, depth: &mut usize) {
         *depth += 1;
         let mut i = 0;
         loop {
-            if i == node.stmts2_len {
+            if i == node.block_stmts_len {
                 break;
             }
-            read_node(node.stmts2[i].as_ref().unwrap(), depth);
+            read_node(node.block_stmts[i].as_ref().unwrap(), depth);
             i += 1;
         }
         *depth -= 1;

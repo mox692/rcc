@@ -82,28 +82,60 @@ test "for (a = 2;  10 < 3; 3+2;)3; for(c = 0; c > 10; 3;) d = 3; 2; return d;" 3
 # block
 test "{3; 3;3; } return 3;" 3
 test "if(3>2){a=3;if(a > 2){3;} }" 3
-test "
-a = 4; 
-b=3;
-c=1;
-if(a<2){
-    b=3;
-    c = 2;
-    if(a > 2){
-        3;
-    }
-} else if (a == 3) {
-    return 32;
-} else {
-    c = 2;
-    if(c > a) {
-        return 22;
-    } else {
-        a = c+b;
-        return a;
-    }
-}" 4
+# test "
+# a=44;
+# e = 3;
+# if(a<2){
+#     b=3;
+#     c = 2;
+# } else {
+#     d = e;
+#     return d;
+# }" 4
 
-# function
-test "a = 3; foo(); return a;" 3 
-test "return 33 + bar();" 33
+# block scope
+
+# expected result, 
+# a -> _1_1
+# b -> _1_1_1
+# c -> _1_1_2
+# d -> _2
+test "
+if(3>2)
+{ 
+    if(3>2)
+    { 
+        a = 3;
+        3; 
+        if(4>3)
+        {
+            b = 3;
+        }
+        if(4>3)
+        {
+            c = 3;
+        }
+    }
+} 
+if(3>2)
+{
+    d = 3;
+    3;
+}" 3
+# # function token
+# test "a = 3; foo(); return a;" 3 
+# test "return 33 + bar();" 33
+
+# val declaration
+# test "int a = 3; a = 6; return a;" 6
+# test "int a = 3; int a = 6; return a;" 6
+# MEMO: block内で宣言されたaがきちんと返されているかどうか。()
+# test "
+# int a = 1;
+# if (2>4) {
+#     int a = 3;
+#     return a;
+# } else {
+#     int a = 5;
+#     return a;
+# }" 3

@@ -1,3 +1,6 @@
+#![feature(map_try_insert)]
+#![feature(core_panic)]
+
 mod codegen;
 mod intermediate_process;
 mod parse;
@@ -34,15 +37,15 @@ fn main() {
 
     let mut tokenReader = NewTokenReader(token);
 
-    let mut function = parse(&mut tokenReader);
+    let mut functions = parse(&mut tokenReader);
     // debug node.
 
-    debug_nodes(debug_flag, &function);
+    // debug_nodes(debug_flag, &function);
 
-    function = intermediate_process(function);
+    functions = intermediate_process(functions);
 
     // generate assembly
-    codegen(&function);
+    codegen(functions);
 
     return;
 }

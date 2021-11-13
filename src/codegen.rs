@@ -7,41 +7,62 @@ use std::io::prelude::*;
 use crate::parse::Function;
 use crate::parse::Node;
 
-struct LocalVariable {
-    pub count: usize,
-    pub local_vals: HashMap<String, usize>,
+struct FunctionLocalVariable {
+    // ident_id: offset
+    ident_id_map: HashMap<String, usize>,
+
+    // current stack size
+    size: usize,
 }
-impl LocalVariable {
-    fn new() -> LocalVariable {
-        return LocalVariable {
-            count: 0,
-            local_vals: HashMap::new(),
+impl FunctionLocalVariable {
+    fn new() -> Self {
+        return Self {
+            ident_id_map: HashMap::new(),
+            size: 0,
         };
     }
-    fn register_symbol(&mut self, symbol: String, offset: usize) {
-        self.local_vals.insert(symbol, offset);
-        return;
+    fn insert(&mut self, blc_str: String, offset: usize) {
+        self.ident_id_map.insert(blc_str, offset);
     }
-    fn incre_count(&mut self) {
-        self.count += 1;
+    // すでにkeyが存在していたら、Errを返す
+    // fn try_insert(&mut self, blc_str: String, offset: usize) -> Result<usize, OccupiedError> {
+    //     self.ident_id_map.try_insert(blc_str, offset)
+    // }
+    fn get_from_ident_id_map(&self, ident_id: String) -> Option<usize> {
+        match self.ident_id_map.get(&ident_id) {
+            None => None,
+            Some(v) => Some(v.clone()),
+        }
     }
-    // new_offset gets symbol name given from codegenarator,
-    // and returns offset from rbp.
-    fn new_offset(&mut self, symbol: String) -> usize {
-        let new_offset = (self.count + 1) * 8;
-        self.incre_count();
-        self.register_symbol(symbol, new_offset);
-        return new_offset;
+    fn new_val_offset(&mut self, block_str: String) -> usize {
+        self.size += 8;
+        self.insert(block_str, self.size);
+        return self.size;
     }
-    fn get_offset(&self, symbol: String) -> usize {
-        match self.local_vals.get::<String>(&symbol) {
+    fn blcstr_to_identid(&self, symbol: String, blcstr: String) -> String {
+        return format!("{}{}", symbol, blcstr);
+    }
+    // block_strとsymbolから、idnet_idを作成する.
+    // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
+    // Errを返す.
+    fn try_new_val_offset(&mut self, symbol: String, blcstr: String) -> Result<usize, &str> {
+        // すでに存在するかcheck
+        let ident_id = self.blcstr_to_identid(symbol, blcstr.clone());
+        match self.get_from_ident_id_map(ident_id.clone()) {
+            Some(_) => Err("Already Exist Symbol"),
             None => {
-                panic!("cannot find local val.")
-            }
-            Some(offset) => {
-                return *offset;
+                self.ident_id_map.insert(ident_id.clone(), self.size + 8);
+                self.size += 8;
+                return Ok(self.size);
             }
         }
+    }
+    fn get_val_offset(&self, symbol: String, blcstr: String) -> usize {
+        let ident_id = self.blcstr_to_identid(symbol, blcstr);
+        self.ident_id_map
+            .get(&ident_id)
+            .unwrap_or_else(|| panic!("unknown symbol!"))
+            .clone()
     }
 }
 
@@ -60,10 +81,17 @@ impl CodeLabel {
     }
 }
 
-pub fn codegen(function: &Function) {
+pub fn codegen(functions: Vec<Function>) {
+    for f in functions.iter() {
+        codegen_func(f.clone());
+    }
+}
+
+pub fn codegen_func(function: Function) {
     let nodes = &function.nodes;
 
-    let mut lv = LocalVariable::new();
+    // let mut lv = LocalVariable::new();
+    let mut lv = FunctionLocalVariable::new();
     let mut cl = CodeLabel::new();
     let mut f = create_file("./gen.s");
     // put start up.
@@ -99,7 +127,7 @@ pub fn codegen(function: &Function) {
 }
 
 // 引数で渡されたNodeを展開して、その評価結果をstack topにpushする.
-fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
+fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeLabel) {
     /*
         gen from unary node.
     */
@@ -125,7 +153,11 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        writeln!(f, "lea -{}(%rbp), %rax", lv.get_offset(node.str.clone()));
+        writeln!(
+            f,
+            "lea -{}(%rbp), %rax",
+            lv.get_val_offset(node.str.clone(), node.block_str.clone())
+        );
         // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
         writeln!(f, "push %rax");
@@ -146,13 +178,16 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
     //       assignで終了するような入力ソースコードを受け取ると、
     //       変な終了コードになりそう.(まあ、さしあたりはそんなことは気にしない.)
     if node.kind == NodeKind::ND_ASSIGN {
+        let offset = match lv.try_new_val_offset(
+            node.l.as_ref().unwrap().str.clone(),
+            node.l.as_ref().unwrap().block_str.clone(),
+        ) {
+            Ok(v) => v,
+            Err(_) => panic!("Symbol duplicated!!"),
+        };
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
-        writeln!(
-            f,
-            "lea -{}(%rbp), %rax",
-            lv.new_offset(node.l.as_ref().unwrap().str.clone())
-        );
+        writeln!(f, "lea -{}(%rbp), %rax", offset);
         writeln!(f, "push %rax");
 
         gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
@@ -162,9 +197,9 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
         return;
     }
 
-    if node.kind == NodeKind::ND_STMT2 {
-        let node_vec = node.stmts2.clone();
-        let len = node.stmts2_len;
+    if node.kind == NodeKind::ND_BLOCK {
+        let node_vec = node.block_stmts.clone();
+        let len = node.block_stmts_len;
         let mut i = 0;
         loop {
             gen(node_vec[i].as_ref().unwrap(), f, lv, cl);
@@ -173,6 +208,11 @@ fn gen(node: &Node, f: &mut File, lv: &mut LocalVariable, cl: &mut CodeLabel) {
                 break;
             }
         }
+        return;
+    }
+
+    if node.kind == NodeKind::ND_STMT2 {
+        gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
         return;
     }
 

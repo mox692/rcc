@@ -103,7 +103,7 @@ impl Lexer {
 #[derive(Clone)]
 struct Tokens(Vec<Token>);
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TokenKind {
     INI,
     NUM,
@@ -123,59 +123,6 @@ pub enum TokenKind {
     ELSE,
     FOR,
 }
-
-impl TokenKind {
-    fn to_string(&self) -> &str {
-        match self {
-            TokenKind::EOF => "EOF",
-            TokenKind::INI => "INI",
-            TokenKind::NUM => "NUM",
-            TokenKind::PUNCT => "PUNCT",
-            TokenKind::IDENT => "IDENT",
-            TokenKind::RETURN => "RETURN",
-            TokenKind::EQ => "EQ",
-            TokenKind::NEQ => "NEQ",
-            TokenKind::LT => "LT",
-            TokenKind::LE => "LE",
-            TokenKind::BT => "BT",
-            TokenKind::BE => "BE",
-            TokenKind::IF => "IF",
-            TokenKind::ELIF => "ELIF",
-            TokenKind::ELSE => "ELSE",
-            TokenKind::FOR => "FOR",
-        }
-    }
-}
-
-impl std::fmt::Display for TokenKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            TokenKind::EOF => write!(f, "EOF"),
-            TokenKind::INI => write!(f, "INI"),
-            TokenKind::NUM => write!(f, "NUM"),
-            TokenKind::PUNCT => write!(f, "PUNCT"),
-            TokenKind::IDENT => write!(f, "IDENT"),
-            TokenKind::RETURN => write!(f, "RETURN"),
-            TokenKind::EQ => write!(f, "EQ"),
-            TokenKind::NEQ => write!(f, "NEQ"),
-            TokenKind::LT => write!(f, "LT"),
-            TokenKind::LE => write!(f, "LE"),
-            TokenKind::BT => write!(f, "BT"),
-            TokenKind::BE => write!(f, "BE"),
-            TokenKind::IF => write!(f, "IF"),
-            TokenKind::ELIF => write!(f, "ELIF"),
-            TokenKind::ELSE => write!(f, "ELSE"),
-            TokenKind::FOR => write!(f, "FOR"),
-        }
-    }
-}
-impl PartialEq for TokenKind {
-    // もっといい実装があるかも.
-    fn eq(&self, other: &Self) -> bool {
-        self.to_string().eq(other.to_string())
-    }
-}
-impl Eq for TokenKind {}
 
 // read chars from lexer' current position and if it matches some specific string,
 // then return it as Token.
@@ -382,13 +329,13 @@ pub fn debug_tokens(flag: bool, tokens: &Vec<Token>) {
 fn print_token_info(tok: &Token) {
     match tok.kind {
         TokenKind::NUM => {
-            println!("kind: {}, val: {}", tok.kind, tok.value,)
+            println!("kind: {:?}, val: {}", tok.kind, tok.value,)
         }
         TokenKind::PUNCT | TokenKind::IDENT => {
-            println!("kind: {}, char: {}", tok.kind, tok.char,)
+            println!("kind: {:?}, char: {}", tok.kind, tok.char,)
         }
         _ => {
-            println!("kind: {}", tok.kind,)
+            println!("kind: {:?}", tok.kind,)
         }
     }
 }

@@ -72,7 +72,7 @@ impl Default for Node {
         };
     }
 }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum NodeKind {
     ND_NUM,
     ND_ADD,
@@ -100,83 +100,6 @@ pub enum NodeKind {
     ND_FNCALL,
     ND_BLOCK,
 }
-impl NodeKind {
-    fn to_string(&self) -> &str {
-        match self {
-            NodeKind::ND_NUM => "NUM",
-            NodeKind::ND_ADD => "ADD",
-            NodeKind::ND_SUB => "SUB",
-            NodeKind::ND_MUL => "MUL",
-            NodeKind::ND_DIV => "DIV",
-            NodeKind::ND_EXPR => "EXPR",
-            NodeKind::ND_IDENT => "IDENT",
-            NodeKind::ND_ASSIGN => "ND_ASSIGN",
-            NodeKind::ND_STMT => "ND_STMT",
-            NodeKind::ND_RETURN => "ND_RETURN",
-            NodeKind::ND_EQ => "ND_EQ",
-            NodeKind::ND_NEQ => "ND_NEQ",
-            NodeKind::ND_BT => "ND_BT",
-            NodeKind::ND_BE => "ND_BE",
-            NodeKind::ND_LT => "ND_LT",
-            NodeKind::ND_LE => "ND_LE",
-            NodeKind::ND_IFSTMT => "ND_IFSTMT",
-            NodeKind::ND_IF => "ND_IF",
-            NodeKind::ND_ELSE => "ND_ELSE",
-            NodeKind::ND_ELSIF => "ND_ELSIF",
-            NodeKind::ND_IFCOND => "ND_IFCOND",
-            NodeKind::ND_FOR => "ND_FOR",
-            NodeKind::ND_STMT2 => "ND_STMT2",
-            NodeKind::ND_BLOCK => "ND_BLOCK",
-            &NodeKind::ND_FNCALL => "ND_FNCALL",
-            _ => {
-                panic!("Not impl NodeKind::to_string")
-            }
-        }
-    }
-}
-impl PartialEq for NodeKind {
-    // もっといい実装があるかも.
-    fn eq(&self, other: &Self) -> bool {
-        self.to_string().eq(other.to_string())
-    }
-}
-impl Eq for NodeKind {}
-
-impl std::fmt::Display for NodeKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            NodeKind::ND_NUM => write!(f, "ND_NUM"),
-            NodeKind::ND_ADD => write!(f, "ND_ADD"),
-            NodeKind::ND_SUB => write!(f, "ND_SUB"),
-            NodeKind::ND_MUL => write!(f, "ND_MUL"),
-            NodeKind::ND_DIV => write!(f, "ND_DIV"),
-            NodeKind::ND_EXPR => write!(f, "ND_EXPR"),
-            NodeKind::ND_IDENT => write!(f, "ND_IDENT"),
-            NodeKind::ND_ASSIGN => write!(f, "ND_ASSIGN"),
-            NodeKind::ND_STMT => write!(f, "ND_STMT"),
-            NodeKind::ND_RETURN => write!(f, "ND_RETURN"),
-            NodeKind::ND_EQ => write!(f, "ND_EQ"),
-            NodeKind::ND_NEQ => write!(f, "ND_NEQ"),
-            NodeKind::ND_BT => write!(f, "ND_BT"),
-            NodeKind::ND_BE => write!(f, "ND_BE"),
-            NodeKind::ND_LT => write!(f, "ND_LT"),
-            NodeKind::ND_LE => write!(f, "ND_LE"),
-            NodeKind::ND_IFSTMT => write!(f, "ND_IFSTMT"),
-            NodeKind::ND_IF => write!(f, "ND_IF"),
-            NodeKind::ND_ELSE => write!(f, "ND_ELSE"),
-            NodeKind::ND_ELSIF => write!(f, "ND_ELSIF"),
-            NodeKind::ND_IFCOND => write!(f, "ND_IFCOND"),
-            NodeKind::ND_FOR => write!(f, "ND_FOR"),
-            NodeKind::ND_STMT2 => write!(f, "ND_STMT2"),
-            NodeKind::ND_BLOCK => write!(f, "ND_BLOCK"),
-            NodeKind::ND_FNCALL => write!(f, "ND_FNCALL"),
-            _ => {
-                panic!("Invalid Node Kind.")
-            }
-        }
-    }
-}
-
 fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_EXPR,
@@ -783,16 +706,16 @@ fn print_node_info(node: &Node, depth: &mut usize) {
     print!("{}", " ".repeat(*depth * 2));
     match node.kind {
         NodeKind::ND_NUM => {
-            println!("kind: {}, val: {}", node.kind, node.val);
+            println!("kind: {:?}, val: {}", node.kind, node.val);
         }
         NodeKind::ND_IDENT => {
-            println!("kind: {}, str: {}", node.kind, node.str)
+            println!("kind: {:?}, str: {}", node.kind, node.str)
         }
         NodeKind::ND_FNCALL => {
-            println!("kind: {}, fn_name: {}", node.kind, node.fn_name)
+            println!("kind: {:?}, fn_name: {}", node.kind, node.fn_name)
         }
         _ => {
-            println!("kind: {}", node.kind);
+            println!("kind: {:?}", node.kind);
         }
     }
 }

@@ -197,7 +197,7 @@ fn gen_num_node(tok: &mut TokenReader) -> Option<Box<Node>> {
         return node;
     }
     tok.error(String::from(format!(
-        "expect num token, but got {}.",
+        "expect num token, but got {:?}.",
         tok.cur_tok().kind
     )));
     panic!();
@@ -674,7 +674,7 @@ pub fn parse(tok: &mut TokenReader) -> Vec<Function> {
 
 pub fn consume_initial_tok(tok: &mut TokenReader) {
     if tok.cur_tok().kind != TokenKind::INI {
-        println!("expect INI TOKEN, but got {}", tok.cur_tok().kind);
+        println!("expect INI TOKEN, but got {:?}", tok.cur_tok().kind);
         panic!("ERR");
     }
     tok.next();

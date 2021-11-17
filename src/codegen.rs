@@ -178,13 +178,11 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     //       assignで終了するような入力ソースコードを受け取ると、
     //       変な終了コードになりそう.(まあ、さしあたりはそんなことは気にしない.)
     if node.kind == NodeKind::ND_ASSIGN {
-        let offset = match lv.try_new_val_offset(
+        // 右辺のoffsetをs取得
+        let offset = lv.get_val_offset(
             node.l.as_ref().unwrap().str.clone(),
             node.l.as_ref().unwrap().block_str.clone(),
-        ) {
-            Ok(v) => v,
-            Err(_) => panic!("Symbol duplicated!!"),
-        };
+        );
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
         writeln!(f, "lea -{}(%rbp), %rax", offset);
@@ -281,6 +279,25 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IFCOND {
         gen(node.l.as_ref().unwrap(), f, lv, cl);
+        return;
+    }
+
+    if node.kind == NodeKind::ND_DECL {
+        let offset = match lv.try_new_val_offset(
+            node.l.as_ref().unwrap().str.clone(),
+            node.l.as_ref().unwrap().block_str.clone(),
+        ) {
+            Ok(v) => v,
+            Err(_) => panic!("Symbol duplicated!!"),
+        };
+
+        writeln!(f, "lea -{}(%rbp), %rax", offset);
+        writeln!(f, "push %rax");
+
+        gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
+        writeln!(f, "pop %rax");
+        writeln!(f, "pop %rdi");
+        writeln!(f, "mov %rax, (%rdi)");
         return;
     }
 

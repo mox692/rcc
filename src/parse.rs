@@ -1,4 +1,4 @@
-use crate::tokenize::{TokenKind, TokenReader};
+use crate::tokenize::{TokenKind, TokenReader, Type};
 
 #[derive(Clone)]
 pub struct Function {
@@ -16,7 +16,7 @@ impl Function {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Node {
     pub kind: NodeKind,
     pub l: Option<Box<Node>>,
@@ -46,6 +46,9 @@ pub struct Node {
 
     // for creating block_str
     pub block_str: String,
+
+    // 変数宣言nodeの
+    pub decl_type: Type,
 }
 impl Default for Node {
     fn default() -> Self {
@@ -69,6 +72,7 @@ impl Default for Node {
             block_stmts_len: 0,
             fn_name: String::new(),
             block_str: String::new(),
+            decl_type: Type::None,
         };
     }
 }
@@ -99,6 +103,7 @@ pub enum NodeKind {
     ND_STMT2,
     ND_FNCALL,
     ND_BLOCK,
+    ND_DECL,
 }
 fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
@@ -294,16 +299,13 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
 // assign = &ident ( "=" equality )*
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = gen_ident_node(tok);
-    loop {
-        if tok.expect("=") {
-            node = Some(Box::new(gen_binary_node(
-                NodeKind::ND_ASSIGN,
-                node,
-                parse_equality(tok.next_tok()),
-            )));
-        } else {
-            break;
-        }
+    if tok.expect("=") {
+        node = Some(Box::new(gen_binary_node(
+            NodeKind::ND_ASSIGN,
+            node,
+            parse_equality(tok.next_tok()),
+        )));
+    } else {
     }
     return node;
 }
@@ -419,14 +421,21 @@ fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     }
 }
 
-// forstmt = "for" "(" assign ";" equality ";" expr ")" stmts
+// forstmt = "for" "(" declare ";" equality ";" expr ")" stmts
 fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Box<Node> = Box::new(Node {
         kind: NodeKind::ND_FOR,
         ..Default::default()
     });
     if tok.cur_tok().char == "(" {
-        node.for_node_first_assign = parse_assign(tok.next_tok());
+        // for(int a = 3;)
+
+        let t = match tok.get_next_tok().kind {
+            TokenKind::TYPE(t) => t,
+            _ => panic!("fds"),
+        };
+
+        node.for_node_first_assign = parse_declare(tok.next_tok(), t);
     } else {
         tok.error(String::from("parse for err.(expect `(`)"));
         panic!();
@@ -488,16 +497,57 @@ fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// stmt = ( assign | return | equality ) ";"
+// declare = &type &ident "=" equality
+// MEMO: typeより後ろはassign式と同じだが、コードジェネレータの都合で、
+// declareの中にassignを入れるようなことはしない.
+fn parse_declare(tok: &mut TokenReader, t: Type) -> Option<Box<Node>> {
+    // cur -> &type
+    let ident_node = gen_ident_node(tok.next_tok());
+    if !tok.expect("=") {
+        panic!("");
+    }
+    let equality_node = parse_equality(tok.next_tok());
+
+    return Some(Box::new(Node {
+        kind: NodeKind::ND_DECL,
+        l: ident_node,
+        r: equality_node,
+        decl_type: t,
+        ..Default::default()
+    }));
+}
+
+// stmt = ( declare | assign | return | equality ) ";"
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
-    if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
-        node = parse_assign(tok);
-    } else if tok.cur_tok().kind == TokenKind::RETURN {
-        node = parse_return(tok);
-    } else {
-        node = parse_equality(tok);
-    }
+    match tok.cur_tok().kind {
+        TokenKind::RETURN => {
+            node = parse_return(tok);
+        }
+        TokenKind::TYPE(t) => {
+            node = parse_declare(tok, t);
+        }
+        // equality or assign
+        TokenKind::IDENT => {
+            if tok.get_next_tok().char == "=" {
+                node = parse_assign(tok);
+            } else {
+                node = parse_equality(tok);
+            }
+        }
+        _ => {
+            node = parse_equality(tok);
+        }
+    };
+    // if tok.cur_tok().kind == TokenKind::TYPE {
+    //     node = parse_declare(tok);
+    // } else if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
+    //     node = parse_assign(tok);
+    // } else if tok.cur_tok().kind == TokenKind::RETURN {
+    //     node = parse_return(tok);
+    // } else {
+    //     node = parse_equality(tok);
+    // }
 
     // MEMO: ここではcurは";"を指している.
     if tok.expect(";") {
@@ -603,11 +653,17 @@ pub fn consume_initial_tok(tok: &mut TokenReader) {
     tok.next();
 }
 
-pub fn debug_nodes(flag: bool, function: &Function) {
-    let nodes = &function.nodes;
+pub fn debug_functions(flag: bool, functions: &Vec<Function>) {
     if !flag {
         return;
     }
+    for function in functions.iter() {
+        debug_nodes(&function.nodes);
+    }
+}
+
+pub fn debug_nodes(nodes: &Vec<Box<Node>>) {
+    // TODO: fn loop
     println!("////////NODE DEBUG START////////");
     println!("{}'s nodes found.", nodes.len());
     for node in nodes.iter() {
@@ -675,16 +731,22 @@ pub fn read_node(node: &Node, depth: &mut usize) {
         *depth -= 1;
         return;
     }
+
+    if node.kind == NodeKind::ND_STMT {
+        *depth += 1;
+        read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+    }
     if node.kind == NodeKind::ND_STMT2 {
         *depth += 1;
-        let mut i = 0;
-        loop {
-            if i == node.block_stmts_len {
-                break;
-            }
-            read_node(node.block_stmts[i].as_ref().unwrap(), depth);
-            i += 1;
-        }
+        read_node(node.l.as_ref().unwrap(), depth);
+        *depth -= 1;
+        return;
+    }
+
+    if node.kind == NodeKind::ND_DECL {
+        *depth += 1;
+        read_node(node.l.as_ref().unwrap(), depth);
         *depth -= 1;
         return;
     }

@@ -103,7 +103,7 @@ impl Lexer {
 #[derive(Clone)]
 struct Tokens(Vec<Token>);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TokenKind {
     INI,
     NUM,
@@ -122,6 +122,12 @@ pub enum TokenKind {
     ELIF,
     ELSE,
     FOR,
+    TYPE(Type),
+}
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Type {
+    None,
+    INT,
 }
 
 // read chars from lexer' current position and if it matches some specific string,
@@ -225,6 +231,7 @@ pub fn tokenize(string: &String) -> Vec<Token> {
                 "for" => tok_kind = TokenKind::FOR,
                 "return" => tok_kind = TokenKind::RETURN,
                 "if" => tok_kind = TokenKind::IF,
+                "int" => tok_kind = TokenKind::TYPE(Type::INT),
                 "else" => {
                     // read whitespace.
                     l.next();

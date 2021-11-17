@@ -8,6 +8,7 @@ mod tokenize;
 
 use codegen::codegen;
 use intermediate_process::intermediate_process;
+use parse::debug_functions;
 use parse::debug_nodes;
 use parse::parse;
 use std::env;
@@ -40,7 +41,7 @@ fn main() {
     let mut functions = parse(&mut tokenReader);
     // debug node.
 
-    // debug_nodes(debug_flag, &function);
+    debug_functions(debug_flag, &functions);
 
     functions = intermediate_process(functions);
 

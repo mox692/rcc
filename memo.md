@@ -51,7 +51,10 @@
   * nextとしては
     * int で、変数宣言の概念を導入
     * (最上位のblockじゃない時に、)同階層にsymbolがなくても、上のblockを順にsearchしていく機能を付け足す.
+      * FunctionLocalVariableのmethodに実装する感じかな.
 
+11/15
+* declとassignを明確に区別する
 ### TODO
 * 変数scopeが何やらおかしい.
   * block
@@ -136,16 +139,18 @@ program = stmts*
 stmts = ( stmts2 | ifstmt | forstmt)
 stmts2 = block | stmt
 block = "{" stmts* "}"
-forstmt = "for" "(" assign ";" equality ";" expr ")" stmts2
+forstmt = "for" "(" declare ";" equality ";" expr ")" stmts2
 ifstmt = "if" if_node ( elsif_node )? ( else_node )?
 if_node = "(" if_cond ")" stmts2
 elsif_node = "else if" "(" if_cond ")" stmts2
 else_node = "else" stmts2
 if_cond = equalit
-stmt = ( assign | return | equality ) ";"
+stmt = ( declare | assign | return | equality ) ";"
+declare = &type &ident "=" equality
+type = "int"
 return = "return" equality
 equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?
-assign = &ident ( "=" equality )*
+assign = &ident "=" equality 
 expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
@@ -154,3 +159,5 @@ unary = &num | &ident | &ident "(" ")"
 
 * 更新
   * 1105: block node追加
+  * 1116: intの変数宣言.
+  

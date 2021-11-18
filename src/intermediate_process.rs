@@ -51,9 +51,9 @@ fn set_lvsize_to_function(f: &mut Function) {
 fn count_fn_localval_size(f: Function) -> usize {
     let mut size: usize = 0;
     let mut val_tbl = FunctionVariableTale::new();
-    for node in f.nodes {
+    for node in f.root_node.fn_blocks {
         let mut s: usize = 0;
-        size += count_node_localval_size(node.as_ref(), &mut val_tbl, &mut s)
+        size += count_node_localval_size(&node, &mut val_tbl, &mut s)
     }
     return size;
 }
@@ -126,7 +126,7 @@ fn count_node_localval_size(
             if i == node.block_stmts_len {
                 break;
             }
-            count_node_localval_size(node.block_stmts[i].as_ref().unwrap(), val_tbl, size);
+            count_node_localval_size(&node.block_stmts[i], val_tbl, size);
             i += 1;
         }
         return *size;
@@ -150,7 +150,7 @@ fn count_node_localval_size(
 }
 
 fn set_block_str_and_create_localval_table(f: Function) -> Function {
-    let mut nodes = f.nodes.clone();
+    let mut nodes = f.root_node.fn_blocks;
     let mut arg = ReadNodeArgs::new();
     let mut i = 0;
     loop {
@@ -162,15 +162,21 @@ fn set_block_str_and_create_localval_table(f: Function) -> Function {
         if i == nodes.len() {
             for (k, v) in &*arg.ident_dir.dir {
                 for (kk, vv) in &*v {
+                    // for debug.
                     // println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
                 }
             }
             break;
         }
     }
+    let root_node = Node {
+        kind: NodeKind::ND_BLOCK,
+        fn_blocks: nodes,
+        ..Default::default()
+    };
     return Function {
         lv_size: f.lv_size,
-        nodes: nodes,
+        root_node: root_node,
     };
 }
 
@@ -216,7 +222,7 @@ impl IdentDir {
     }
 }
 
-fn read_node(node: &mut Box<Node>, arg: &mut ReadNodeArgs) {
+fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     //
     // Terminal symbol.
     //
@@ -321,7 +327,7 @@ fn read_node(node: &mut Box<Node>, arg: &mut ReadNodeArgs) {
             if i == node.block_stmts_len {
                 break;
             }
-            read_node(&mut node.block_stmts[i].as_mut().unwrap(), arg);
+            read_node(&mut node.block_stmts[i], arg);
             i += 1;
         }
         // depth以下の情報は破棄する.

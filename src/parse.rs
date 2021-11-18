@@ -2,14 +2,15 @@ use crate::tokenize::{TokenKind, TokenReader, Type};
 
 #[derive(Clone)]
 pub struct Function {
-    pub nodes: Vec<Box<Node>>,
+    // Root Function Node
+    pub root_node: Node,
     // The size at which the code generator lowers the stack.
     pub lv_size: usize,
 }
 impl Function {
-    pub fn new(nodes: Vec<Box<Node>>) -> Function {
+    pub fn new(root_node: Node) -> Function {
         return Function {
-            nodes: nodes,
+            root_node: root_node,
             // TODO: calc lv from nodes.
             lv_size: 0,
         };
@@ -41,7 +42,7 @@ pub struct Node {
     pub fn_name: String,
 
     // for block
-    pub block_stmts: Vec<Option<Box<Node>>>,
+    pub block_stmts: Vec<Node>,
     pub block_stmts_len: usize,
 
     // for creating block_str
@@ -49,6 +50,11 @@ pub struct Node {
 
     // 変数宣言nodeの
     pub decl_type: Type,
+
+    // function
+    pub fn_type: Type,
+    pub fn_ident: String,
+    pub fn_blocks: Vec<Node>, // BoxじゃないNode!!
 }
 impl Default for Node {
     fn default() -> Self {
@@ -73,11 +79,15 @@ impl Default for Node {
             fn_name: String::new(),
             block_str: String::new(),
             decl_type: Type::None,
+            fn_type: Type::None,
+            fn_ident: String::new(),
+            fn_blocks: Vec::new(),
         };
     }
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum NodeKind {
+    ND_ROOT,
     ND_NUM,
     ND_ADD,
     ND_SUB,
@@ -562,14 +572,14 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
 
 // block = "{" stmts* "}"
 fn parse_block(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let mut stmts: Vec<Option<Box<Node>>> = Vec::new();
+    let mut stmts: Vec<Node> = Vec::new();
     let mut node = Box::new(Node {
         kind: NodeKind::ND_BLOCK,
         ..Default::default()
     });
     let mut c = 0;
     loop {
-        let _node = parse_stmts(tok);
+        let _node = parse_stmts(tok).unwrap().as_ref().clone();
         stmts.push(_node);
         c += 1;
         if tok.cur_tok().char == "}" {
@@ -613,21 +623,41 @@ fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// program = stmts*
-fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
-    let mut nodes: Vec<Box<Node>> = Vec::new();
-    loop {
-        // TODO: ここ要る?
-        if tok.cur_tok().char == "\0" {
-            break;
-        }
-        let node = parse_stmts(tok);
-        nodes.push(node.unwrap());
-        if tok.cur_tok().char == "\0" {
-            break;
-        }
+// function = int ident "(" ")" block
+fn parse_function(tok: &mut TokenReader) -> Function {
+    let t = match tok.cur_tok().kind {
+        TokenKind::TYPE(t) => t,
+        _ => panic!("expected type!!"),
+    };
+
+    let fn_ident = gen_ident_node(tok.next_tok());
+
+    if tok.cur_tok().char == "(" && tok.get_next_tok().char == ")" {
+        tok.next_nth_tok(3);
+    } else {
+        panic!("Invalid format.")
     }
-    return nodes;
+
+    // MEMO: 純正のNodeを返すように.
+    // MEMO: コード(Nodeが何もない時に、unwrap_or_elseがErrorになりそう.)
+    let fn_block_nodes = parse_block(tok)
+        .unwrap_or_else(|| panic!("No program input!!"))
+        .as_ref()
+        .clone();
+
+    let n = Node {
+        kind: NodeKind::ND_ROOT,
+        fn_blocks: fn_block_nodes.block_stmts,
+        ..Default::default()
+    };
+    let function = Function::new(n);
+    return function;
+}
+
+// program = function
+fn parse_program(tok: &mut TokenReader) -> Function {
+    let f = parse_function(tok);
+    return f;
 }
 
 // generate several nodes, and return Function.
@@ -635,9 +665,7 @@ fn parse_program(tok: &mut TokenReader) -> Vec<Box<Node>> {
 pub fn parse(tok: &mut TokenReader) -> Vec<Function> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
-    let mut nodes: Vec<Box<Node>> = parse_program(tok);
-
-    let function = Function::new(nodes);
+    let function = parse_program(tok);
 
     // TODO: 文法を変えて、複数のfunctionをparseできるように.
     //       今は手動でVec<Function>を返すようにしてる
@@ -658,11 +686,11 @@ pub fn debug_functions(flag: bool, functions: &Vec<Function>) {
         return;
     }
     for function in functions.iter() {
-        debug_nodes(&function.nodes);
+        debug_nodes(&function.root_node.fn_blocks);
     }
 }
 
-pub fn debug_nodes(nodes: &Vec<Box<Node>>) {
+pub fn debug_nodes(nodes: &Vec<Node>) {
     // TODO: fn loop
     println!("////////NODE DEBUG START////////");
     println!("{}'s nodes found.", nodes.len());

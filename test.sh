@@ -68,7 +68,7 @@ test "int main(){int a = 5 <= 5; int b = 4; a + b;}" 5
 
 # if statement.
 test "int main(){if (2 < 5) 34;}" 34
-test "int main(){if (3 > 2) {int a = 2;} a;}" 2
+# test "int main(){if (3 > 2) {int a = 2;} a;}" 2 -> will panic
 test "int main(){int a = 3; int b = 2; if (a * b > a + b) return 3; int c = 32; return c + c;}" 3
 test "int main(){int a = 3; int b = 2; if (a * b < a + b) return 3; int c = 32; if (c < b * a) return c + b; int d = 22; d + c;}" 54
 test "int main(){if (2 < 5) 33; else if (3 < 2) 34;}" 33
@@ -77,7 +77,7 @@ test "int main(){if (2 > 5) 33; else int a = 4; return a;}" 4
 
 # for statement.
 test "int main(){for (int a = 2;  10 < 3; 3+2;) {int b = 3; 2; return b;}}" 3
-test "int main(){for (int a = 2;  10 < 3; 3+2;){3;} for(int c = 0; c > 10; 3;){int d = 3; 2;} return d;}" 3
+# test "int main(){for (int a = 2;  10 < 3; 3+2;){3;} for(int c = 0; c > 10; 3;){int d = 3; 2;} return d;}" 3 -> will panic.
 
 # block
 test "int main(){{3; 3;3; } return 3;}" 3
@@ -152,3 +152,34 @@ int main() {
     }
 }
 " 4
+
+test "
+int main() {
+    int a = 3;
+    if(6>3) {
+        if(6>3) {
+            if(6>3) {
+                if(6>3) {
+                    return a;
+                }
+            }
+        }
+    }
+}
+" 3
+
+test "
+int main() {
+    if(6>3) {
+        int b = 4;
+        if(6>3) {
+            if(6>3) {
+                if(6>3) {
+                    b = 2;
+                }
+            }
+        }
+        return b;
+    }
+}
+" 2 

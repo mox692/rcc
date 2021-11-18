@@ -54,6 +54,7 @@ pub struct Node {
     // function
     pub fn_type: Type,
     pub fn_ident: String,
+    // root_nodeのみが保有するfield.
     pub fn_blocks: Vec<Node>, // BoxじゃないNode!!
 }
 impl Default for Node {

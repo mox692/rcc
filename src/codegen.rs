@@ -42,6 +42,7 @@ impl FunctionLocalVariable {
     fn blcstr_to_identid(&self, symbol: String, blcstr: String) -> String {
         return format!("{}{}", symbol, blcstr);
     }
+
     // block_strとsymbolから、idnet_idを作成する.
     // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
     // Errを返す.
@@ -57,12 +58,51 @@ impl FunctionLocalVariable {
             }
         }
     }
-    fn get_val_offset(&self, symbol: String, blcstr: String) -> usize {
-        let ident_id = self.blcstr_to_identid(symbol, blcstr);
-        self.ident_id_map
-            .get(&ident_id)
-            .unwrap_or_else(|| panic!("unknown symbol!"))
-            .clone()
+
+    // ident_idからそのblockのdepthを返す.
+    fn ident_id_to_depth(&self, ident_id: &String) -> usize {
+        let mut count = 0;
+        for c in ident_id.chars() {
+            if c.eq(&'_') {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    // ident_idを受け取り、その1つ上のblockにある同名symbolを表すblockstrを返す.
+    // ex:
+    // _1_2 => _1
+    // _1_2_3 => _1_2
+    // _1 => None
+    fn upper_block_ident_id(&self, ident_id: &String) -> Option<String> {
+        let mut v: Vec<&str> = ident_id.split("_").collect();
+        match v.pop() {
+            None => return None,
+            Some(_) => {}
+        };
+        return Some(v.join("_"));
+    }
+
+    // 変数のsymbolとblcstrを受け取り、その変数のrbpからのoffsetを返す.
+    // 同じblock内に検索しているsymbolがなかった場合、より浅いblockでの検索を
+    // 繰り返す.最も浅いblock(関数のblock)にも該当するsymbolがなかった場合は
+    // Noneを返す.
+    fn get_val_offset(&self, symbol: String, blcstr: String) -> Option<usize> {
+        let mut ident_id = self.blcstr_to_identid(symbol, blcstr);
+        let depth = self.ident_id_to_depth(&ident_id);
+        for _ in 0..=depth - 1 {
+            match self.ident_id_map.get(&ident_id) {
+                Some(offset) => return Some(offset.clone()),
+                None => {}
+            }
+            match self.upper_block_ident_id(&ident_id) {
+                Some(id) => ident_id = id,
+                None => {}
+            };
+        }
+        // 該当するsymbolがなかった際.
+        return None;
     }
 }
 
@@ -153,11 +193,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        writeln!(
-            f,
-            "lea -{}(%rbp), %rax",
-            lv.get_val_offset(node.str.clone(), node.block_str.clone())
-        );
+        let offset = lv
+            .get_val_offset(node.str.clone(), node.block_str.clone())
+            .unwrap_or_else(|| panic!("Undeclared symbol!!"));
+        writeln!(f, "lea -{}(%rbp), %rax", offset);
         // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
         writeln!(f, "push %rax");
@@ -179,10 +218,12 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     //       変な終了コードになりそう.(まあ、さしあたりはそんなことは気にしない.)
     if node.kind == NodeKind::ND_ASSIGN {
         // 右辺のoffsetをs取得
-        let offset = lv.get_val_offset(
-            node.l.as_ref().unwrap().str.clone(),
-            node.l.as_ref().unwrap().block_str.clone(),
-        );
+        let offset = lv
+            .get_val_offset(
+                node.l.as_ref().unwrap().str.clone(),
+                node.l.as_ref().unwrap().block_str.clone(),
+            )
+            .unwrap_or_else(|| panic!("Undecleare symbol!!"));
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
         writeln!(f, "lea -{}(%rbp), %rax", offset);

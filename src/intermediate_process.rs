@@ -149,6 +149,8 @@ fn count_node_localval_size(
     return *size;
 }
 
+// Functionが保有するnodeを読み、block_nodeに対してラベル付け(block_str)を行う.
+// ラベル付けされたnodeを保有するFunctionを返す.
 fn set_block_str_and_create_localval_table(f: Function) -> Function {
     let mut nodes = f.root_node.fn_blocks;
     let mut arg = ReadNodeArgs::new();
@@ -190,9 +192,9 @@ struct ReadNodeArgs {
 impl ReadNodeArgs {
     fn new() -> Self {
         return ReadNodeArgs {
-            index: vec![0; 10],
-            depth: 0,
-            cur_str: String::new(),
+            index: vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], // TODO: 暫定的な処置
+            depth: 1,
+            cur_str: String::from("_1"),
             ident_dir: IdentDir::new(),
         };
     }
@@ -247,6 +249,52 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         );
         return;
     }
+    if node.kind == NodeKind::ND_BLOCK {
+        let mut i = 0;
+        // MEMO:
+        /*  main() {
+            // ここのblockは `_1` (depth: 1)
+
+                {
+                    // ここのblockは `_1_1` (index:1, depth:2)
+                    {
+                        // ここのblockは `_1_1_1` (index:1, depth:3)
+                    }
+                    {
+                        // ここのblockは `_1_1_2` (index:2, depth:3)
+                        {
+
+                        }
+                        {
+                            // ここのblockは `_1_1_2_2` (index:2, depth:4)
+                        }
+                    }
+                }
+                {
+                    // ここのblockは `_1_2` (index:1, depth:2)
+                }
+            }
+        */
+        // depth = 1
+        arg.depth += 1;
+        // index[1] = 1
+        arg.index[arg.depth] += 1;
+        arg.cur_str = block_str_from_index(arg.depth.clone(), &arg.index);
+        loop {
+            if i == node.block_stmts_len {
+                break;
+            }
+            read_node(&mut node.block_stmts[i], arg);
+            i += 1;
+        }
+        // depth以下の情報は破棄する.
+        for i in (arg.depth + 1)..10 {
+            arg.index[i] = 0;
+        }
+        arg.depth -= 1;
+        arg.cur_str = block_str_from_index(arg.depth.clone(), &arg.index);
+        return;
+    }
     if node.kind == NodeKind::ND_NUM {
         return;
     }
@@ -291,53 +339,6 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         return;
     }
 
-    if node.kind == NodeKind::ND_BLOCK {
-        let mut i = 0;
-        // MEMO:
-        /*  main() {
-            // ここのblockは `_0`
-
-                {
-                    // ここのblockは `_1` (index:1, depth:1)
-                    {
-                        // ここのblockは `_1_1` (index:1, depth:2)
-                    }
-                    {
-                        // ここのblockは `_1_2` (index:2, depth:2)
-                        {
-
-                        }
-                        {
-                            // ここのblockは `_1_2_2` (index:2, depth:3)
-                        }
-                    }
-                }
-                {
-                    // ここのblockは `_2`
-                }
-            }
-        */
-
-        arg.depth += 1;
-        // *depth += 1; // depthを1に
-        arg.index[arg.depth] += 1;
-        // index[*depth] += 1; // depth1のindexを1に
-        arg.cur_str = block_str_from_index(arg.depth.clone(), &arg.index);
-        loop {
-            if i == node.block_stmts_len {
-                break;
-            }
-            read_node(&mut node.block_stmts[i], arg);
-            i += 1;
-        }
-        // depth以下の情報は破棄する.
-        for i in (arg.depth + 1)..10 {
-            arg.index[i] = 0;
-        }
-        arg.depth -= 1;
-        return;
-    }
-
     if node.kind == NodeKind::ND_STMT2 {
         read_node(&mut node.l.as_mut().unwrap(), arg);
         return;
@@ -355,6 +356,7 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     return;
 }
 
+// depth = 1, index[1] = 1
 fn block_str_from_index(depth: usize, index: &Vec<usize>) -> String {
     let mut base = String::from("");
     for i in 1..=depth {

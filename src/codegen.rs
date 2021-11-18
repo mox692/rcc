@@ -88,7 +88,7 @@ pub fn codegen(functions: Vec<Function>) {
 }
 
 pub fn codegen_func(function: Function) {
-    let nodes = &function.nodes;
+    let root_node = &function.root_node;
 
     // let mut lv = LocalVariable::new();
     let mut lv = FunctionLocalVariable::new();
@@ -116,8 +116,8 @@ pub fn codegen_func(function: Function) {
     // 各stmt毎にcodegen.
     // TODO: 将来的には(Nodeというより)Function毎にcodegenをしていくイメージ.
     //       また、関数ごとに(上で書いている様な)prologue,epilogueの処理を入れる.
-    for node in nodes {
-        gen(node, &mut f, &mut lv, &mut cl);
+    for node in root_node.fn_blocks.clone() {
+        gen(&node, &mut f, &mut lv, &mut cl);
     }
 
     writeln!(f, "pop %rax");
@@ -200,7 +200,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         let len = node.block_stmts_len;
         let mut i = 0;
         loop {
-            gen(node_vec[i].as_ref().unwrap(), f, lv, cl);
+            gen(&node_vec[i], f, lv, cl);
             i += 1;
             if len == i {
                 break;

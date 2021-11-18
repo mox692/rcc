@@ -135,7 +135,8 @@ if (a < 1) {
 ### Current Syntax
 ```
 source = program
-program = stmts*
+program = function
+function = int ident "(" ")" block
 stmts = ( stmts2 | ifstmt | forstmt)
 stmts2 = block | stmt
 block = "{" stmts* "}"
@@ -160,4 +161,6 @@ unary = &num | &ident | &ident "(" ")"
 * 更新
   * 1105: block node追加
   * 1116: intの変数宣言.
+  * 1117: parserの処理対象をfunctionに変更
+
   

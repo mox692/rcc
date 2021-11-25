@@ -55,21 +55,12 @@
 
 11/15
 * declとassignを明確に区別する
+
+11/18
+* block scopeがやっとできたーーー
+* 次はちょっと一旦refactorしたい.
+
 ### TODO
-* 変数scopeが何やらおかしい.
-  * block
-    * 下記はとりあえず落ちた
-    * scope関連は、さしあたりの目標はfunction scopeにしたい.
-    * function作る時にまた考える.
-* 変数宣言と、代入を分ける
-  * a = 3; とした時に、今は宣言か代入かわからない
-  * 宣言の場合は、その変数のscopeも記録するようにする.
-    * https://godbolt.org/ で試して見た結果、
-      * local変数をカウントするのは、function毎(blockごとにはしてないみたい)
-      * block内で同じ変数名で再び宣言があったら、別の変数として扱う
-        * その前にblockというnodeを追加する
-          * blockにはindexを表現したstringを保存するようにする
-  * `int a = 44;`みたいに、はじめは全てint型にする.
 * 複数のfunctionをparseできるように
   * `int hoge() {}`という構文を新しく追加する必要がある.
   * `int main() {}`がないとerror.
@@ -77,6 +68,8 @@
   * `hoge()`でhogeの定義にjmpするように
   * local変数の時と同様に、fucntion table的なものを作成した方がいいかも
       
+* Error msgを豊富にする.
+
 ```
 a = 4;
 b=3;

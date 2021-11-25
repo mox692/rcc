@@ -9,7 +9,6 @@ mod tokenize;
 use codegen::codegen;
 use intermediate_process::intermediate_process;
 use parse::debug_functions;
-use parse::debug_nodes;
 use parse::parse;
 use std::env;
 use tokenize::debug_tokens;
@@ -18,29 +17,26 @@ use tokenize::NewTokenReader;
 use tokenize::Token;
 
 fn main() {
-    // [args]
-    // arg[1] -> source input.
-    // arg[2] -> debug flag.
-    let mut args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect();
+    let mut input: String = args[1].clone();
     let arg_len = args.len();
     let mut debug_flag = false;
 
     // (tokenizeがしやすくなるため)終端文字を加える.
-    args[1].push('\0');
+    input.push('\0');
     if arg_len == 3 {
         debug_flag = if args[2].eq("true") { true } else { false };
     }
 
-    let input: &String = &args[1];
     let token: Vec<Token> = tokenize(input);
     // debug token.
     debug_tokens(debug_flag, &token);
 
-    let mut tokenReader = NewTokenReader(token);
+    let mut token_reader = NewTokenReader(token);
 
-    let mut functions = parse(&mut tokenReader);
+    let mut functions = parse(&mut token_reader);
+
     // debug node.
-
     debug_functions(debug_flag, &functions);
 
     functions = intermediate_process(functions);

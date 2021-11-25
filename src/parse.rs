@@ -4,7 +4,8 @@ use crate::tokenize::{TokenKind, TokenReader, Type};
 pub struct Function {
     // Root Function Node
     pub root_node: Node,
-    // The size at which the code generator lowers the stack.
+    // The local variable size, to which the processor lower,
+    // when this function called.
     pub lv_size: usize,
 }
 impl Function {

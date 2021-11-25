@@ -30,129 +30,23 @@ impl FunctionVariableTale {
 
 // Functionに対して、local変数のカウントを行ったり、
 // (将来的には)最適化的なことを行う.
-pub fn intermediate_process(mut fvec: Vec<Function>) -> Vec<Function> {
-    let mut fvec_after = vec![];
+pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
+    let mut fvec_after_processed = vec![];
     for f in fvec.iter() {
         let mut f_clone = f.clone();
-        // 関数のstack_sizeを計測.
-        set_lvsize_to_function(&mut f_clone);
+
         // 関数のlocal変数表の作成.
-        f_clone = set_block_str_and_create_localval_table(f_clone);
-        fvec_after.push(f_clone);
+        set_block_str_and_create_localval_table(&mut f_clone);
+
+        fvec_after_processed.push(f_clone);
     }
-    return fvec_after;
+    return fvec_after_processed;
 }
 
-fn set_lvsize_to_function(f: &mut Function) {
-    let f_clone = f.clone();
-    f.lv_size = count_fn_localval_size(f_clone);
-}
-
-fn count_fn_localval_size(f: Function) -> usize {
-    let mut size: usize = 0;
-    let mut val_tbl = FunctionVariableTale::new();
-    for node in f.root_node.fn_blocks {
-        let mut s: usize = 0;
-        size += count_node_localval_size(&node, &mut val_tbl, &mut s)
-    }
-    return size;
-}
-
-fn count_node_localval_size(
-    node: &Node,
-    val_tbl: &mut FunctionVariableTale,
-    size: &mut usize,
-) -> usize {
-    //
-    // Terminal symbol.
-    //
-    if node.kind == NodeKind::ND_IDENT {
-        if val_tbl.or_push(node.str.clone()) {
-            *size += 1;
-        }
-        return *size;
-    }
-    if node.kind == NodeKind::ND_NUM {
-        return *size;
-    }
-
-    // for ND_EXPR, ND_STMT.
-    if node.kind == NodeKind::ND_EXPR
-        || node.kind == NodeKind::ND_STMT
-        || node.kind == NodeKind::ND_RETURN
-    {
-        count_node_localval_size(node.l.as_ref().unwrap(), val_tbl, size);
-        return *size;
-    }
-
-    // for for_stmt
-    if node.kind == NodeKind::ND_FOR {
-        count_node_localval_size(node.for_node_first_assign.as_ref().unwrap(), val_tbl, size);
-        count_node_localval_size(
-            node.for_node_second_condition.as_ref().unwrap(),
-            val_tbl,
-            size,
-        );
-        count_node_localval_size(node.for_node_third_expr.as_ref().unwrap(), val_tbl, size);
-        count_node_localval_size(node.for_node_stmts.as_ref().unwrap(), val_tbl, size);
-        return *size;
-    }
-
-    // for if_stmt
-    if node.kind == NodeKind::ND_IFSTMT {
-        count_node_localval_size(node.if_node.as_ref().unwrap(), val_tbl, size);
-        if node.elsif_node.is_some() {
-            count_node_localval_size(node.elsif_node.as_ref().unwrap(), val_tbl, size);
-        }
-        if node.else_node.is_some() {
-            count_node_localval_size(node.else_node.as_ref().unwrap(), val_tbl, size);
-        }
-        return *size;
-    }
-
-    if node.kind == NodeKind::ND_IFCOND {
-        count_node_localval_size(node.l.as_ref().unwrap(), val_tbl, size);
-        return *size;
-    }
-
-    if node.kind == NodeKind::ND_ELSE {
-        count_node_localval_size(node.l.as_ref().unwrap(), val_tbl, size);
-        return *size;
-    }
-
-    if node.kind == NodeKind::ND_BLOCK {
-        let mut i = 0;
-        loop {
-            if i == node.block_stmts_len {
-                break;
-            }
-            count_node_localval_size(&node.block_stmts[i], val_tbl, size);
-            i += 1;
-        }
-        return *size;
-    }
-
-    if node.kind == NodeKind::ND_STMT2 {
-        count_node_localval_size(node.l.as_ref().unwrap(), val_tbl, size);
-        return *size;
-    }
-
-    if node.kind == NodeKind::ND_FNCALL {
-        return *size;
-    }
-
-    /*
-        read binary_node.
-    */
-    count_node_localval_size(node.l.as_ref().unwrap(), val_tbl, size);
-    count_node_localval_size(node.r.as_ref().unwrap(), val_tbl, size);
-    return *size;
-}
-
-// Functionが保有するnodeを読み、block_nodeに対してラベル付け(block_str)を行う.
-// ラベル付けされたnodeを保有するFunctionを返す.
-fn set_block_str_and_create_localval_table(f: Function) -> Function {
-    let mut nodes = f.root_node.fn_blocks;
+// Read the all nodes owned by Function and create variable table.
+// In addition, it counts size to which rsp lowered when called this function.
+fn set_block_str_and_create_localval_table(f: &mut Function) {
+    let mut nodes = f.root_node.fn_blocks.clone();
     let mut arg = ReadNodeArgs::new();
     let mut i = 0;
     loop {
@@ -171,23 +65,32 @@ fn set_block_str_and_create_localval_table(f: Function) -> Function {
             break;
         }
     }
+
     let root_node = Node {
         kind: NodeKind::ND_BLOCK,
         fn_blocks: nodes,
         ..Default::default()
     };
-    return Function {
-        lv_size: f.lv_size,
-        root_node: root_node,
-    };
+    f.root_node = root_node;
+    f.lv_size = arg.val_size;
 }
 
+// A structure that summarizes the information that is passed 
+// to the read_node().
+// 
+// Currently, this struct is used mainly for labeling block-node
+// to specify variable scopes.
 struct ReadNodeArgs {
+    // current block-node index at same depth.
     index: Vec<usize>,
+    // current block-node depth.
     depth: usize,
+    // hold current blc_str. 
     cur_str: String,
-    // <usize(blockの階層), Hashmap(ident table)>
+    // current function's all variables. See IdentDir-struct part.
     ident_dir: IdentDir,
+    // current size to which rsp lower when called this function.
+    val_size: usize,
 }
 impl ReadNodeArgs {
     fn new() -> Self {
@@ -196,26 +99,68 @@ impl ReadNodeArgs {
             depth: 1,
             cur_str: String::from("_1"),
             ident_dir: IdentDir::new(),
+            val_size: 0,
         };
     }
 }
 
-// Funcion内のsymbolを格納するstruct.
+// IdentDir store all variable in current function.
+// For each block-node depth, it holds hashmap of ident table.
 pub struct IdentDir {
-    pub dir: Box<HashMap<usize, HashMap<String, String>>>,
+    pub dir: Box<HashMap<usize, IdentTable>>
 }
+
+type IdentTable = HashMap<BlockStr, Symbol>;
+
+// BlockStr is kind like hash value which should be unique in 
+// the same block-node depth. This hash value is determined by depth and index.
+// Actual block_str example is below.
+//
+// [example]
+// 
+/*  
+    main() {
+    // here, block_str is `_1` (depth: 1)
+
+        {
+            // here, block_str is `_1_1` (index:1, depth:2)
+            {
+                // here, block_str is `_1_1_1` (index:1, depth:3)
+            }
+            {
+                // here, block_str is `_1_1_2` (index:2, depth:3)
+                {
+
+                }
+                {
+                    // here, block_str is `_1_1_2_2` (index:2, depth:4)
+                }
+            }
+        }
+        {
+            // here, block_str is `_1_2` (index:1, depth:2)
+        }
+    }
+*/
+type BlockStr = String;
+
+// symbol is variable's symbol
+type Symbol = String; 
+
 impl IdentDir {
     pub fn new() -> Self {
         return Self {
             dir: Box::new(HashMap::new()),
         };
     }
-    pub fn insert_nth_depth_identtable(&mut self, n: usize, ident_table: (String, String)) {
+    // register ident_table entry to nth deph IdentTable.
+    pub fn insert_nth_depth_identtable(&mut self, n: usize, ident_table_ent: (BlockStr, Symbol)) {
         let mut nth_ident_table = self.get_nth_depth_identtable_or(n);
-        nth_ident_table.insert(ident_table.0, ident_table.1);
+        nth_ident_table.insert(ident_table_ent.0, ident_table_ent.1);
         self.dir.insert(n, nth_ident_table);
     }
-    pub fn get_nth_depth_identtable_or(&self, n: usize) -> HashMap<String, String> {
+    // get ident_table entry from nth deph IdentTable.
+    pub fn get_nth_depth_identtable_or(&self, n: usize) -> HashMap<BlockStr, Symbol> {
         let nth_ident_table = match self.dir.get(&n) {
             Some(t) => t.clone(),
             _ => HashMap::new(),
@@ -225,56 +170,51 @@ impl IdentDir {
 }
 
 fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
-    //
-    // Terminal symbol.
-    //
+    /*
+        idnet node.
+     */
     if node.kind == NodeKind::ND_IDENT {
-        // MEMO: そのidentが作成されたblockを示す、block_strを入れる.
+        // そのidentが作成されたblockを示す、block_strを入れる.
         node.block_str = arg.cur_str.clone();
-
-        // TODO: ここのident tableにblock_strを入れる処理、method化したい.(ここの位置にあると見辛い)
-
-        // // intmapのcloneを作成
-        // let mut ident_table = match arg.ident_dir.get(&arg.depth) {
-        //     Some(ident_table) => ident_table.clone(),
-        //     // このdepthでの初めてのident_table entryを作る時
-        //     None => HashMap::new(),
-        // };
-        // // cloneにこのidentnodeの識別子の情報を入れる.
-        // ident_table.insert(node.block_str.clone(), String::from(node.str.clone()));
-
         arg.ident_dir.insert_nth_depth_identtable(
             arg.depth,
             (node.block_str.clone(), String::from(node.str.clone())),
         );
+
+        // increment arg.size according to its variable type.
+        arg.val_size += 1;
+        
         return;
     }
-    if node.kind == NodeKind::ND_BLOCK {
-        let mut i = 0;
-        // MEMO:
-        /*  main() {
-            // ここのblockは `_1` (depth: 1)
 
+    /*
+        block node.
+     */
+    /*  main() {
+        // ここのblockは `_1` (depth: 1)
+
+            {
+                // ここのblockは `_1_1` (index:1, depth:2)
                 {
-                    // ここのblockは `_1_1` (index:1, depth:2)
-                    {
-                        // ここのblockは `_1_1_1` (index:1, depth:3)
-                    }
-                    {
-                        // ここのblockは `_1_1_2` (index:2, depth:3)
-                        {
-
-                        }
-                        {
-                            // ここのblockは `_1_1_2_2` (index:2, depth:4)
-                        }
-                    }
+                    // ここのblockは `_1_1_1` (index:1, depth:3)
                 }
                 {
-                    // ここのblockは `_1_2` (index:1, depth:2)
+                    // ここのblockは `_1_1_2` (index:2, depth:3)
+                    {
+
+                    }
+                    {
+                        // ここのblockは `_1_1_2_2` (index:2, depth:4)
+                    }
                 }
             }
-        */
+            {
+                // ここのblockは `_1_2` (index:1, depth:2)
+            }
+        }
+    */
+    if node.kind == NodeKind::ND_BLOCK {
+        let mut i = 0;
         // depth = 1
         arg.depth += 1;
         // index[1] = 1
@@ -299,15 +239,24 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         return;
     }
 
-    // for ND_EXPR, ND_STMT.
+
+    /*
+        nodes that have next node in left side.
+     */
     if node.kind == NodeKind::ND_EXPR
         || node.kind == NodeKind::ND_STMT
         || node.kind == NodeKind::ND_RETURN
+        || node.kind == NodeKind::ND_IFCOND
+        || node.kind == NodeKind::ND_ELSE
+        || node.kind == NodeKind::ND_STMT2
     {
         read_node(&mut node.l.as_mut().unwrap(), arg);
         return;
     }
 
+    /*
+        irregular nodes that don't have next node neither in left nor right.
+     */
     // for for_stmt
     if node.kind == NodeKind::ND_FOR {
         read_node(&mut node.for_node_first_assign.as_mut().unwrap(), arg);
@@ -316,7 +265,6 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         read_node(&mut node.for_node_stmts.as_mut().unwrap(), arg);
         return;
     }
-
     // for if_stmt
     if node.kind == NodeKind::ND_IFSTMT {
         read_node(&mut node.if_node.as_mut().unwrap(), arg);
@@ -328,22 +276,7 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         }
         return;
     }
-
-    if node.kind == NodeKind::ND_IFCOND {
-        read_node(&mut node.l.as_mut().unwrap(), arg);
-        return;
-    }
-
-    if node.kind == NodeKind::ND_ELSE {
-        read_node(&mut node.l.as_mut().unwrap(), arg);
-        return;
-    }
-
-    if node.kind == NodeKind::ND_STMT2 {
-        read_node(&mut node.l.as_mut().unwrap(), arg);
-        return;
-    }
-
+    // for fncall
     if node.kind == NodeKind::ND_FNCALL {
         return;
     }

@@ -172,7 +172,7 @@ fn read_punct(l: &mut Lexer) -> Token {
     panic!("");
 }
 
-pub fn tokenize(string: &String) -> Vec<Token> {
+pub fn tokenize(string: String) -> Vec<Token> {
     let mut l = Lexer::new(string.clone());
     let tok = Token {
         kind: TokenKind::INI,

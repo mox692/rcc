@@ -4,40 +4,92 @@ use crate::parse::Function;
 use crate::parse::Node;
 use crate::parse::NodeKind;
 
-// Functionに対して、
-// ·各block-nodeごとに変数をlabel(BlockStr)付けする.
-// ·Function内のlocal変数の合計サイズを計算(関数呼び出し時に引き下げるrspの値の計算に使用).
-//
-// MEMO: (将来的には)最適化的なことを行う.
-pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
-    let mut fvec_after_processed = vec![];
-    for f in fvec.iter() {
-        let mut f_clone = f.clone();
+// IdentID is a unique label for Functino's local variable,
+// and generated from blockstr. This label holds variable's
+// scope information.
+pub type IdentID = String;
 
-        // localのcount, label付け
-        set_block_str_and_create_localval_table(&mut f_clone);
-
-        fvec_after_processed.push(f_clone);
-    }
-    return fvec_after_processed;
+#[derive(Clone)]
+pub struct FunctionLocalVariable {
+    // variable table hashmap which holds ident_id - val_offset
+    pub val_table: HashMap<IdentID, usize>,
+    // current offset address from rbp.
+    // this value will be updated each time ident-node is found.
+    pub current_offset: usize,
 }
-
-// Read the all nodes owned by Function and create variable table.
-// In addition, it counts size to which rsp lowered when called this function.
-fn set_block_str_and_create_localval_table(f: &mut Function) {
-    let mut nodes = f.root_node.fn_blocks.clone();
-    let mut arg = ReadNodeArgs::new();
-    for node in nodes.as_mut() as &mut Vec<Node> {
-        read_node(node, &mut arg);
+impl FunctionLocalVariable {
+    pub fn new() -> Self {
+        return Self {
+            val_table: HashMap::new(),
+            current_offset: 0,
+        };
     }
-    let root_node = Node {
-        kind: NodeKind::ND_BLOCK,
-        fn_blocks: nodes,
-        ..Default::default()
+    // block_strとsymbolから、idnet_idを作成する.
+    // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
+    // Errを返す.
+    pub fn try_new_val_offset(&mut self, symbol: Symbol, blcstr: BlockStr) -> Result<usize, &str> {
+        let ident_id = blockstr_to_identid(symbol, blcstr.clone());
+        match self.get_val_offset_by_identid(ident_id.clone()) {
+            // すでに同じsymbolが同じscope内で宣言されている.
+            Some(_) => Err("Already Exist Symbol"),
+            None => {
+                self.current_offset += 8;
+                self.val_table.insert(ident_id.clone(), self.current_offset);
+                return Ok(self.current_offset);
+            }
+        }
+    }
+    pub fn get_val_offset_by_identid(&self, ident_id: IdentID) -> Option<&usize> {
+        return self.val_table.get(&ident_id);
+    }
+    // 変数のsymbolとblcstrを受け取り、その変数のrbpからのoffsetを返す.
+    // 同じblock内に検索しているsymbolがなかった場合、より浅いblockでの検索を
+    // 繰り返す.最も浅いblock(関数のblock)にも該当するsymbolがなかった場合は
+    // Noneを返す.
+    pub fn get_val_offset_by_identid_recursively(&self, ident_id: IdentID) -> Option<usize> {
+        let depth = identid_to_depth(&ident_id);
+
+        let mut current_ident_id = ident_id.clone();
+        for _ in 0..=depth - 1 {
+            match self.val_table.get(&current_ident_id) {
+                Some(offset) => return Some(offset.clone()),
+                None => {}
+            }
+            // currentのdepthにない場合、current_ident_idを更新
+            match upper_block_ident_id(&current_ident_id) {
+                Some(id) => current_ident_id = id,
+                None => {}
+            };
+        }
+        // 該当するsymbolがなかった際.
+        return None;
+    }
+}
+// build identid from symbol, blockstr
+pub fn blockstr_to_identid(symbol: Symbol, block_str: BlockStr) -> IdentID {
+    return format!("{}{}", symbol, block_str);
+}
+fn identid_to_depth(ident_id: &IdentID) -> usize {
+    let mut count = 0;
+    for c in ident_id.chars() {
+        if c.eq(&'_') {
+            count += 1;
+        }
+    }
+    return count;
+}
+// ident_idを受け取り、その1つ上のblockにある同名symbolを表すblockstrを返す.
+// ex:
+// _1_2 => _1
+// _1_2_3 => _1_2
+// _1 => None
+fn upper_block_ident_id(ident_id: &String) -> Option<String> {
+    let mut v: Vec<&str> = ident_id.split("_").collect();
+    match v.pop() {
+        None => return None,
+        Some(_) => {}
     };
-    f.root_node = root_node;
-    f.lv_size = arg.val_size;
-    return;
+    return Some(v.join("_"));
 }
 
 // A structure that summarizes the information that is passed
@@ -51,9 +103,9 @@ struct ReadNodeArgs {
     // current block-node depth.
     depth: usize,
     // hold current blc_str.
-    cur_str: String,
+    cur_block_str: String,
     // current function's all variables. See IdentDir-struct part.
-    ident_dir: IdentDir,
+    local_variable: FunctionLocalVariable,
     // current size to which rsp lower when called this function.
     val_size: usize,
 }
@@ -62,20 +114,12 @@ impl ReadNodeArgs {
         return ReadNodeArgs {
             index: vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], // TODO: 暫定的な処置
             depth: 1,
-            cur_str: String::from("_1"),
-            ident_dir: IdentDir::new(),
+            cur_block_str: String::from("_1"),
+            local_variable: FunctionLocalVariable::new(),
             val_size: 0,
         };
     }
 }
-
-// IdentDir store all variable in current function.
-// For each block-node depth, it holds hashmap of ident table.
-pub struct IdentDir {
-    pub dir: Box<HashMap<usize, IdentTable>>,
-}
-
-type IdentTable = HashMap<BlockStr, Symbol>;
 
 // BlockStr is kind like hash value which should be unique in
 // the same block-node depth. This hash value is determined by depth and index.
@@ -119,26 +163,42 @@ fn build_block_str(depth: usize, index: &Vec<usize>) -> String {
 // symbol is variable's symbol
 pub type Symbol = String;
 
-impl IdentDir {
-    pub fn new() -> Self {
-        return Self {
-            dir: Box::new(HashMap::new()),
-        };
+// Functionに対して、
+// ·各block-nodeごとに変数をlabel(BlockStr)付けする.
+// ·Function内のlocal変数の合計サイズを計算(関数呼び出し時に引き下げるrspの値の計算に使用).
+//
+// MEMO: (将来的には)最適化的なことを行う.
+pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
+    let mut fvec_after_processed = vec![];
+
+    for f in fvec.iter() {
+        let mut f_clone = f.clone();
+
+        // localのcount, label付け
+        set_block_str_and_create_localval_table(&mut f_clone);
+
+        fvec_after_processed.push(f_clone);
     }
-    // register ident_table entry to nth deph IdentTable.
-    pub fn insert_nth_depth_identtable(&mut self, n: usize, ident_table_ent: (BlockStr, Symbol)) {
-        let mut nth_ident_table = self.get_nth_depth_identtable_or(n);
-        nth_ident_table.insert(ident_table_ent.0, ident_table_ent.1);
-        self.dir.insert(n, nth_ident_table);
+    return fvec_after_processed;
+}
+
+// Read the all nodes owned by Function and create variable table.
+// In addition, it counts size to which rsp lowered when called this function.
+fn set_block_str_and_create_localval_table(f: &mut Function) {
+    let mut nodes = f.root_node.fn_blocks.clone();
+    let mut arg = ReadNodeArgs::new();
+    for node in nodes.as_mut() as &mut Vec<Node> {
+        read_node(node, &mut arg);
     }
-    // get ident_table entry from nth deph IdentTable.
-    pub fn get_nth_depth_identtable_or(&self, n: usize) -> HashMap<BlockStr, Symbol> {
-        let nth_ident_table = match self.dir.get(&n) {
-            Some(t) => t.clone(),
-            _ => HashMap::new(),
-        };
-        return nth_ident_table;
-    }
+    let root_node = Node {
+        kind: NodeKind::ND_BLOCK,
+        fn_blocks: nodes,
+        ..Default::default()
+    };
+    f.root_node = root_node;
+    f.lv_size = arg.val_size;
+    f.local_variable = arg.local_variable;
+    return;
 }
 
 fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
@@ -147,11 +207,11 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     */
     if node.kind == NodeKind::ND_IDENT {
         // そのidentが作成されたblockを示す、block_strを入れる.
-        node.block_str = arg.cur_str.clone();
-        arg.ident_dir.insert_nth_depth_identtable(
-            arg.depth,
-            (node.block_str.clone(), String::from(node.str.clone())),
-        );
+        // TODO: 多分使わなくなる
+        node.block_str = arg.cur_block_str.clone();
+        // TODO: こっちがメインになる
+        // let ident_id = blockstr_to_identid(node.str.clone(),build_block_str(arg.depth, &arg.index));
+        // arg.local_variable.get_val_offset_by_identid_recursively(ident_id).unwrap_or_else(|| {println!("variable not found. {}", node.l.as_ref().unwrap().str); panic!("");});
 
         // increment arg.size according to its variable type.
         arg.val_size += 1;
@@ -161,7 +221,7 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     if node.kind == NodeKind::ND_BLOCK {
         arg.depth += 1;
         arg.index[arg.depth] += 1;
-        arg.cur_str = build_block_str(arg.depth, &arg.index);
+        arg.cur_block_str = build_block_str(arg.depth, &arg.index);
 
         for block_stmt in node.block_stmts.as_mut() as &mut Vec<Node> {
             read_node(block_stmt, arg);
@@ -172,7 +232,7 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
             arg.index[i] = 0;
         }
         arg.depth -= 1;
-        arg.cur_str = build_block_str(arg.depth, &arg.index);
+        arg.cur_block_str = build_block_str(arg.depth, &arg.index);
         return;
     }
     if node.kind == NodeKind::ND_NUM {
@@ -223,6 +283,39 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     /*
         read binary_node.
     */
+    if node.kind == NodeKind::ND_ASSIGN {
+        // TODO: get_val_offset_by_identid_recursively()で、既存のsymbolを探しにいく.
+        let block_str = build_block_str(arg.depth, &arg.index);
+        let ident_id = blockstr_to_identid(node.l.as_ref().unwrap().str.clone(), block_str);
+        let offset = arg
+            .local_variable
+            .get_val_offset_by_identid_recursively(ident_id)
+            .unwrap_or_else(|| {
+                println!("variable not found. {}", node.l.as_ref().unwrap().str);
+                panic!("");
+            });
+
+        read_node(&mut node.l.as_mut().unwrap(), arg);
+        read_node(&mut node.r.as_mut().unwrap(), arg);
+        return;
+    }
+
+    if node.kind == NodeKind::ND_DECL {
+        let block_str = build_block_str(arg.depth, &arg.index);
+        // TODO: declnにblockstrがひっついている構造
+        node.block_str = block_str.clone();
+        let offset = match arg
+            .local_variable
+            .try_new_val_offset(node.l.as_ref().unwrap().str.clone(), block_str)
+        {
+            Ok(v) => v,
+            Err(_) => panic!("Symbol duplicated."),
+        };
+        read_node(&mut node.l.as_mut().unwrap(), arg);
+        read_node(&mut node.r.as_mut().unwrap(), arg);
+
+        return;
+    }
     read_node(&mut node.l.as_mut().unwrap(), arg);
     read_node(&mut node.r.as_mut().unwrap(), arg);
     return;

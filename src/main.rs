@@ -2,6 +2,7 @@
 #![feature(core_panic)]
 
 mod codegen;
+mod errors;
 mod intermediate_process;
 mod parse;
 mod tokenize;
@@ -15,10 +16,13 @@ use tokenize::debug_tokens;
 use tokenize::tokenize;
 use tokenize::NewTokenReader;
 use tokenize::Token;
+// use once_cell::sync::Lazy;
+// use std::sync::Mutex;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut input: String = args[1].clone();
+
     let arg_len = args.len();
     let mut debug_flag = false;
 

@@ -1,3 +1,6 @@
+use crate::errors::display_around_pos;
+use crate::errors::init_error;
+
 #[derive(Clone)]
 pub struct Token {
     pub kind: TokenKind,
@@ -5,16 +8,30 @@ pub struct Token {
     pub value: i32,
     pub char: String,
     pub next_token: Option<Box<Token>>,
+
+    // Position from the beginning of the input source.
+    pub pos: usize,
 }
 impl Token {
-    fn new_token(kind: TokenKind, value: i32, char: String) -> Token {
+    fn new_token(kind: TokenKind, value: i32, char: String, cur_pos: usize) -> Token {
         let tok: Token = Token {
             kind: kind,
             value: value,
             char: char,
             next_token: None,
+            pos: cur_pos,
         };
         return tok;
+    }
+    // このtokenのinputからのoffset値(token構造体にあるposではない)を返す.
+    pub fn input_pos(&self) -> usize {
+        return self.pos - self.char.len();
+    }
+    pub fn len(&self) -> usize {
+        if self.kind == TokenKind::NUM {
+            return self.value.to_string().len();
+        }
+        return self.char.len();
     }
 }
 
@@ -42,6 +59,9 @@ impl Lexer {
     }
     fn cur_char(&self) -> char {
         return self.char;
+    }
+    fn cur_pos(&self) -> usize {
+        return self.pos;
     }
     fn next(&mut self) -> &mut Self {
         self.pos += 1;
@@ -135,50 +155,54 @@ pub enum Type {
 fn read_punct(l: &mut Lexer) -> Token {
     // multi char.
     if l.expect_and_read("==") {
-        return Token::new_token(TokenKind::EQ, 0, String::from("=="));
+        return Token::new_token(TokenKind::EQ, 0, String::from("=="), l.cur_pos());
     } else if l.expect_and_read("!=") {
-        return Token::new_token(TokenKind::NEQ, 0, String::from("!="));
+        return Token::new_token(TokenKind::NEQ, 0, String::from("!="), l.cur_pos());
     } else if l.expect_and_read("<=") {
-        return Token::new_token(TokenKind::LE, 0, String::from("<="));
+        return Token::new_token(TokenKind::LE, 0, String::from("<="), l.cur_pos());
     } else if l.expect_and_read(">=") {
-        return Token::new_token(TokenKind::BE, 0, String::from(">="));
+        return Token::new_token(TokenKind::BE, 0, String::from(">="), l.cur_pos());
     }
     // single char.
     if l.expect_and_read("=") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("="));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("="), l.cur_pos());
     } else if l.expect_and_read("<") {
-        return Token::new_token(TokenKind::LT, 0, String::from("<"));
+        return Token::new_token(TokenKind::LT, 0, String::from("<"), l.cur_pos());
     } else if l.expect_and_read(">") {
-        return Token::new_token(TokenKind::BT, 0, String::from(">"));
+        return Token::new_token(TokenKind::BT, 0, String::from(">"), l.cur_pos());
     } else if l.expect_and_read("+") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("+"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("+"), l.cur_pos());
     } else if l.expect_and_read("-") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("-"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("-"), l.cur_pos());
     } else if l.expect_and_read("*") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("*"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("*"), l.cur_pos());
     } else if l.expect_and_read("/") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("/"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("/"), l.cur_pos());
     } else if l.expect_and_read(";") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from(";"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from(";"), l.cur_pos());
     } else if l.expect_and_read("(") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("("));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("("), l.cur_pos());
     } else if l.expect_and_read(")") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from(")"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from(")"), l.cur_pos());
     } else if l.expect_and_read("{") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("{"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("{"), l.cur_pos());
     } else if l.expect_and_read("}") {
-        return Token::new_token(TokenKind::PUNCT, 0, String::from("}"));
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("}"), l.cur_pos());
     }
     panic!("");
 }
 
 pub fn tokenize(string: String) -> Vec<Token> {
+    init_error(string.clone());
+
     let mut l = Lexer::new(string.clone());
+
     let tok = Token {
         kind: TokenKind::INI,
         value: 0,
         char: String::from(""),
         next_token: None,
+        pos: 0,
     };
 
     l.push_tok(tok);
@@ -186,7 +210,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
     loop {
         let char = l.cur_char();
         if char.eq(&'\0') {
-            let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"));
+            let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"), l.cur_pos());
             l.push_tok(tok);
             break;
         }
@@ -214,7 +238,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
                 cur_num = cur_num * 10 + char.to_digit(10).unwrap() as i32;
                 l.next_char();
             }
-            let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""));
+            let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""), l.cur_pos());
             l.push_tok(tok);
             continue;
         }
@@ -244,7 +268,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
                 }
                 _ => tok_kind = TokenKind::IDENT,
             }
-            let tok = Token::new_token(tok_kind, 0, cur_str);
+            let tok = Token::new_token(tok_kind, 0, cur_str, l.cur_pos());
             l.push_tok(tok);
             continue;
         }
@@ -256,7 +280,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
         }
         panic!("something wrong...")
     }
-    // return tok_vec;
+
     return l.token_vec;
 }
 
@@ -269,6 +293,12 @@ impl TokenReader {
     // return cur's index Token.
     pub fn cur_tok(&self) -> Token {
         return self.tokens[self.cur as usize].clone();
+    }
+    pub fn cur_input_pos(&self) -> usize {
+        return self.cur_tok().input_pos();
+    }
+    pub fn cur_tok_len(&self) -> usize {
+        return self.cur_tok().len();
     }
     // increment cur, and return its self
     pub fn next_tok(&mut self) -> &mut Self {
@@ -305,12 +335,29 @@ impl TokenReader {
             false
         }
     }
-    // report unexpected result.
-    pub fn error(&self, message: String) {
-        print!(":::::::::ERROR:::::::::\nmessage: {}\n", message);
-        print_token_info(&self.cur_tok());
-        print!(":::::::::::::::::::::::\n");
-        panic!("");
+    pub fn error(&self, input_pos: usize, message: String, tok_len: usize) -> ! {
+        // TODO: refactor
+        let str = display_around_pos(input_pos);
+        print!("input pos: {}\n", input_pos);
+        print!("tok len: {}\n", tok_len);
+        print!("Err place:\n");
+        print!("{}\n", str);
+
+        if input_pos < 9 {
+            for _ in 0..input_pos {
+                print!(" ");
+            }
+        } else {
+            for _ in 0..10 {
+                print!(" ");
+            }
+        }
+        for _ in 0..tok_len {
+            print!("^");
+        }
+        println!("");
+        println!("Err message: {}", message);
+        panic!()
     }
 }
 
@@ -336,13 +383,13 @@ pub fn debug_tokens(flag: bool, tokens: &Vec<Token>) {
 fn print_token_info(tok: &Token) {
     match tok.kind {
         TokenKind::NUM => {
-            println!("kind: {:?}, val: {}", tok.kind, tok.value,)
+            println!("kind: {:?}, val: {}, pos: {}", tok.kind, tok.value, tok.pos)
         }
         TokenKind::PUNCT | TokenKind::IDENT => {
-            println!("kind: {:?}, char: {}", tok.kind, tok.char,)
+            println!("kind: {:?}, char: {}, pos: {}", tok.kind, tok.char, tok.pos)
         }
         _ => {
-            println!("kind: {:?}", tok.kind,)
+            println!("kind: {:?}, pos: {}", tok.kind, tok.pos)
         }
     }
 }

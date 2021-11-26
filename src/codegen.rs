@@ -1,99 +1,10 @@
-use crate::intermediate_process::BlockStr;
-use crate::intermediate_process::Symbol;
+use crate::intermediate_process::blockstr_to_identid;
+use crate::intermediate_process::FunctionLocalVariable;
 use crate::parse::Function;
 use crate::parse::Node;
 use crate::parse::NodeKind;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-
-// IdentID is a unique label for Functino's local variable,
-// and generated from blockstr. This label holds variable's
-// scope information.
-type IdentID = String;
-
-// build identid from symbol, blockstr
-fn blockstr_to_identid(symbol: Symbol, block_str: BlockStr) -> IdentID {
-    return format!("{}{}", symbol, block_str);
-}
-fn identid_to_depth(ident_id: &IdentID) -> usize {
-    let mut count = 0;
-    for c in ident_id.chars() {
-        if c.eq(&'_') {
-            count += 1;
-        }
-    }
-    return count;
-}
-// ident_idを受け取り、その1つ上のblockにある同名symbolを表すblockstrを返す.
-// ex:
-// _1_2 => _1
-// _1_2_3 => _1_2
-// _1 => None
-fn upper_block_ident_id(ident_id: &String) -> Option<String> {
-    let mut v: Vec<&str> = ident_id.split("_").collect();
-    match v.pop() {
-        None => return None,
-        Some(_) => {}
-    };
-    return Some(v.join("_"));
-}
-
-struct FunctionLocalVariable {
-    // variable table hashmap which holds ident_id - val_offset
-    val_table: HashMap<IdentID, usize>,
-    // current offset address from rbp.
-    // this value will be updated each time ident-node is found.
-    current_offset: usize,
-}
-impl FunctionLocalVariable {
-    fn new() -> Self {
-        return Self {
-            val_table: HashMap::new(),
-            current_offset: 0,
-        };
-    }
-    // block_strとsymbolから、idnet_idを作成する.
-    // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
-    // Errを返す.
-    fn try_new_val_offset(&mut self, symbol: Symbol, blcstr: BlockStr) -> Result<usize, &str> {
-        let ident_id = blockstr_to_identid(symbol, blcstr.clone());
-        match self.get_val_offset_by_identid(ident_id.clone()) {
-            // すでに同じsymbolが同じscope内で宣言されている.
-            Some(_) => Err("Already Exist Symbol"),
-            None => {
-                self.current_offset += 8;
-                self.val_table.insert(ident_id.clone(), self.current_offset);
-                return Ok(self.current_offset);
-            }
-        }
-    }
-    fn get_val_offset_by_identid(&self, ident_id: IdentID) -> Option<&usize> {
-        return self.val_table.get(&ident_id);
-    }
-    // 変数のsymbolとblcstrを受け取り、その変数のrbpからのoffsetを返す.
-    // 同じblock内に検索しているsymbolがなかった場合、より浅いblockでの検索を
-    // 繰り返す.最も浅いblock(関数のblock)にも該当するsymbolがなかった場合は
-    // Noneを返す.
-    fn get_val_offset_by_identid_recursively(&self, ident_id: IdentID) -> Option<usize> {
-        let depth = identid_to_depth(&ident_id);
-
-        let mut current_ident_id = ident_id.clone();
-        for _ in 0..=depth - 1 {
-            match self.val_table.get(&current_ident_id) {
-                Some(offset) => return Some(offset.clone()),
-                None => {}
-            }
-            // currentのdepthにない場合、current_ident_idを更新
-            match upper_block_ident_id(&current_ident_id) {
-                Some(id) => current_ident_id = id,
-                None => {}
-            };
-        }
-        // 該当するsymbolがなかった際.
-        return None;
-    }
-}
 
 // forやifでjmpする先のLabelを管理するstruct.
 struct CodeLabel {
@@ -105,9 +16,6 @@ impl CodeLabel {
     }
     fn cur_label_index(&self) -> usize {
         return self.cur_index;
-    }
-    fn increment(&mut self) {
-        self.cur_index += 1;
     }
 }
 
@@ -121,7 +29,7 @@ pub fn codegen_func(function: Function) {
     let root_node = &function.root_node;
 
     // let mut lv = LocalVariable::new();
-    let mut lv = FunctionLocalVariable::new();
+    let mut lv = function.local_variable;
     let mut cl = CodeLabel::new();
     let mut f = create_file("./gen.s");
     // put start up.
@@ -190,7 +98,6 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
             ))
             .unwrap_or_else(|| panic!("Undeclared symbol!!"));
         writeln!(f, "lea -{}(%rbp), %rax", offset);
-        // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
         writeln!(f, "mov (%rax), %rax");
         writeln!(f, "push %rax");
         return;
@@ -219,6 +126,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
             .unwrap_or_else(|| panic!("Undecleare symbol!!"));
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
+        // TODO: getoffsetで、identIDを入れたらoffsetが出て9両に
         writeln!(f, "lea -{}(%rbp), %rax", offset);
         writeln!(f, "push %rax");
 
@@ -230,14 +138,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_BLOCK {
         let node_vec = node.block_stmts.clone();
-        let len = node.block_stmts_len;
-        let mut i = 0;
-        loop {
-            gen(&node_vec[i], f, lv, cl);
-            i += 1;
-            if len == i {
-                break;
-            }
+        for node in node_vec.iter() {
+            gen(node, f, lv, cl);
         }
         return;
     }
@@ -313,13 +215,15 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
 
     if node.kind == NodeKind::ND_DECL {
-        let offset = match lv.try_new_val_offset(
-            node.l.as_ref().unwrap().str.clone(),
-            node.l.as_ref().unwrap().block_str.clone(),
-        ) {
-            Ok(v) => v,
-            Err(_) => panic!("Symbol duplicated!!"),
-        };
+        // TODO: declnにblockstrがひっついている構造
+        let ident_id =
+            blockstr_to_identid(node.l.as_ref().unwrap().str.clone(), node.block_str.clone());
+        let offset = lv
+            .get_val_offset_by_identid(ident_id.clone())
+            .unwrap_or_else(|| {
+                println!("ident_id: {}", ident_id.clone());
+                panic!("Not Found!!")
+            });
 
         writeln!(f, "lea -{}(%rbp), %rax", offset);
         writeln!(f, "push %rax");

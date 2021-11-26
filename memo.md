@@ -69,6 +69,11 @@
   * local変数の時と同様に、fucntion table的なものを作成した方がいいかも
       
 * Error msgを豊富にする.
+* local valのdebug機構
+  * inputをglobalで持ちたい.
+    * node探索時のErr(codegenとか)からでも、token列(=入力文字列)でErrを示してあげられるように.
+    * lazyStaticとか？
+
 
 ```
 a = 4;

@@ -1,103 +1,92 @@
+use crate::intermediate_process::BlockStr;
+use crate::intermediate_process::Symbol;
+use crate::parse::Function;
+use crate::parse::Node;
 use crate::parse::NodeKind;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
-// ref: https://keens.github.io/blog/2018/12/08/rustnomoju_runotsukaikata_2018_editionhan/
-use crate::parse::Function;
-use crate::parse::Node;
+// IdentID is a unique label for Functino's local variable,
+// and generated from blockstr. This label holds variable's
+// scope information.
+type IdentID = String;
+
+// build identid from symbol, blockstr
+fn blockstr_to_identid(symbol: Symbol, block_str: BlockStr) -> IdentID {
+    return format!("{}{}", symbol, block_str);
+}
+fn identid_to_depth(ident_id: &IdentID) -> usize {
+    let mut count = 0;
+    for c in ident_id.chars() {
+        if c.eq(&'_') {
+            count += 1;
+        }
+    }
+    return count;
+}
+// ident_idを受け取り、その1つ上のblockにある同名symbolを表すblockstrを返す.
+// ex:
+// _1_2 => _1
+// _1_2_3 => _1_2
+// _1 => None
+fn upper_block_ident_id(ident_id: &String) -> Option<String> {
+    let mut v: Vec<&str> = ident_id.split("_").collect();
+    match v.pop() {
+        None => return None,
+        Some(_) => {}
+    };
+    return Some(v.join("_"));
+}
 
 struct FunctionLocalVariable {
-    // ident_id: offset
-    ident_id_map: HashMap<String, usize>,
-
-    // current stack size
-    size: usize,
+    // variable table hashmap which holds ident_id - val_offset
+    val_table: HashMap<IdentID, usize>,
+    // current offset address from rbp.
+    // this value will be updated each time ident-node is found.
+    current_offset: usize,
 }
 impl FunctionLocalVariable {
     fn new() -> Self {
         return Self {
-            ident_id_map: HashMap::new(),
-            size: 0,
+            val_table: HashMap::new(),
+            current_offset: 0,
         };
     }
-    fn insert(&mut self, blc_str: String, offset: usize) {
-        self.ident_id_map.insert(blc_str, offset);
-    }
-    // すでにkeyが存在していたら、Errを返す
-    // fn try_insert(&mut self, blc_str: String, offset: usize) -> Result<usize, OccupiedError> {
-    //     self.ident_id_map.try_insert(blc_str, offset)
-    // }
-    fn get_from_ident_id_map(&self, ident_id: String) -> Option<usize> {
-        match self.ident_id_map.get(&ident_id) {
-            None => None,
-            Some(v) => Some(v.clone()),
-        }
-    }
-    fn new_val_offset(&mut self, block_str: String) -> usize {
-        self.size += 8;
-        self.insert(block_str, self.size);
-        return self.size;
-    }
-    fn blcstr_to_identid(&self, symbol: String, blcstr: String) -> String {
-        return format!("{}{}", symbol, blcstr);
-    }
-
     // block_strとsymbolから、idnet_idを作成する.
     // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
     // Errを返す.
-    fn try_new_val_offset(&mut self, symbol: String, blcstr: String) -> Result<usize, &str> {
-        // すでに存在するかcheck
-        let ident_id = self.blcstr_to_identid(symbol, blcstr.clone());
-        match self.get_from_ident_id_map(ident_id.clone()) {
+    fn try_new_val_offset(&mut self, symbol: Symbol, blcstr: BlockStr) -> Result<usize, &str> {
+        let ident_id = blockstr_to_identid(symbol, blcstr.clone());
+        match self.get_val_offset_by_identid(ident_id.clone()) {
+            // すでに同じsymbolが同じscope内で宣言されている.
             Some(_) => Err("Already Exist Symbol"),
             None => {
-                self.ident_id_map.insert(ident_id.clone(), self.size + 8);
-                self.size += 8;
-                return Ok(self.size);
+                self.current_offset += 8;
+                self.val_table.insert(ident_id.clone(), self.current_offset);
+                return Ok(self.current_offset);
             }
         }
     }
-
-    // ident_idからそのblockのdepthを返す.
-    fn ident_id_to_depth(&self, ident_id: &String) -> usize {
-        let mut count = 0;
-        for c in ident_id.chars() {
-            if c.eq(&'_') {
-                count += 1;
-            }
-        }
-        return count;
+    fn get_val_offset_by_identid(&self, ident_id: IdentID) -> Option<&usize> {
+        return self.val_table.get(&ident_id);
     }
-
-    // ident_idを受け取り、その1つ上のblockにある同名symbolを表すblockstrを返す.
-    // ex:
-    // _1_2 => _1
-    // _1_2_3 => _1_2
-    // _1 => None
-    fn upper_block_ident_id(&self, ident_id: &String) -> Option<String> {
-        let mut v: Vec<&str> = ident_id.split("_").collect();
-        match v.pop() {
-            None => return None,
-            Some(_) => {}
-        };
-        return Some(v.join("_"));
-    }
-
     // 変数のsymbolとblcstrを受け取り、その変数のrbpからのoffsetを返す.
     // 同じblock内に検索しているsymbolがなかった場合、より浅いblockでの検索を
     // 繰り返す.最も浅いblock(関数のblock)にも該当するsymbolがなかった場合は
     // Noneを返す.
-    fn get_val_offset(&self, symbol: String, blcstr: String) -> Option<usize> {
-        let mut ident_id = self.blcstr_to_identid(symbol, blcstr);
-        let depth = self.ident_id_to_depth(&ident_id);
+    fn get_val_offset_by_identid_recursively(&self, ident_id: IdentID) -> Option<usize> {
+        let depth = identid_to_depth(&ident_id);
+
+        let mut current_ident_id = ident_id.clone();
         for _ in 0..=depth - 1 {
-            match self.ident_id_map.get(&ident_id) {
+            match self.val_table.get(&current_ident_id) {
                 Some(offset) => return Some(offset.clone()),
                 None => {}
             }
-            match self.upper_block_ident_id(&ident_id) {
-                Some(id) => ident_id = id,
+            // currentのdepthにない場合、current_ident_idを更新
+            match upper_block_ident_id(&current_ident_id) {
+                Some(id) => current_ident_id = id,
                 None => {}
             };
         }
@@ -106,6 +95,7 @@ impl FunctionLocalVariable {
     }
 }
 
+// forやifでjmpする先のLabelを管理するstruct.
 struct CodeLabel {
     cur_index: usize,
 }
@@ -194,7 +184,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
         let offset = lv
-            .get_val_offset(node.str.clone(), node.block_str.clone())
+            .get_val_offset_by_identid_recursively(blockstr_to_identid(
+                node.str.clone(),
+                node.block_str.clone(),
+            ))
             .unwrap_or_else(|| panic!("Undeclared symbol!!"));
         writeln!(f, "lea -{}(%rbp), %rax", offset);
         // TODO: get_offsetに(変数が見つからなかった際の)errハンドリングもやらせる
@@ -219,10 +212,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     if node.kind == NodeKind::ND_ASSIGN {
         // 右辺のoffsetをs取得
         let offset = lv
-            .get_val_offset(
+            .get_val_offset_by_identid_recursively(blockstr_to_identid(
                 node.l.as_ref().unwrap().str.clone(),
                 node.l.as_ref().unwrap().block_str.clone(),
-            )
+            ))
             .unwrap_or_else(|| panic!("Undecleare symbol!!"));
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
@@ -235,7 +228,6 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         writeln!(f, "mov %rax, (%rdi)");
         return;
     }
-
     if node.kind == NodeKind::ND_BLOCK {
         let node_vec = node.block_stmts.clone();
         let len = node.block_stmts_len;
@@ -249,12 +241,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         }
         return;
     }
-
     if node.kind == NodeKind::ND_STMT2 {
         gen(node.l.as_ref().unwrap().as_ref(), f, lv, cl);
         return;
     }
-
     if node.kind == NodeKind::ND_FOR {
         // To prevent name crash, we assign unique
         // (as long as this for scope) label.
@@ -278,7 +268,6 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         writeln!(f, ".{}:", for_end_label);
         return;
     }
-
     // NodeKind::ND_IFSTMT is the node that will be the entry
     // for all if statements. This block calls the ND_IF, ND_ELSIF,
     // and ND_ELSE statement codegen.

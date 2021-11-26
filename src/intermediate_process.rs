@@ -4,38 +4,17 @@ use crate::parse::Function;
 use crate::parse::Node;
 use crate::parse::NodeKind;
 
-struct FunctionVariableTale {
-    pub tbl: Vec<String>,
-}
-impl FunctionVariableTale {
-    fn new() -> Self {
-        return Self { tbl: Vec::new() };
-    }
-    fn or_push(&mut self, str: String) -> bool {
-        if self.search(str.clone()) {
-            return false;
-        }
-        self.tbl.push(str.clone());
-        return true;
-    }
-    fn search(&self, str: String) -> bool {
-        for val in self.tbl.iter() {
-            if val.as_str() == str.as_str() {
-                return true;
-            }
-        }
-        return false;
-    }
-}
-
-// Functionに対して、local変数のカウントを行ったり、
-// (将来的には)最適化的なことを行う.
+// Functionに対して、
+// ·各block-nodeごとに変数をlabel(BlockStr)付けする.
+// ·Function内のlocal変数の合計サイズを計算(関数呼び出し時に引き下げるrspの値の計算に使用).
+//
+// MEMO: (将来的には)最適化的なことを行う.
 pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
     let mut fvec_after_processed = vec![];
     for f in fvec.iter() {
         let mut f_clone = f.clone();
 
-        // 関数のlocal変数表の作成.
+        // localのcount, label付け
         set_block_str_and_create_localval_table(&mut f_clone);
 
         fvec_after_processed.push(f_clone);
@@ -48,24 +27,9 @@ pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
 fn set_block_str_and_create_localval_table(f: &mut Function) {
     let mut nodes = f.root_node.fn_blocks.clone();
     let mut arg = ReadNodeArgs::new();
-    let mut i = 0;
-    loop {
-        let mut node = nodes[i].clone();
-        read_node(&mut node, &mut arg);
-        // 書き換わったnodeを、元のnodeのvectorに書き戻す.
-        nodes[i] = node;
-        i += 1;
-        if i == nodes.len() {
-            for (k, v) in &*arg.ident_dir.dir {
-                for (kk, vv) in &*v {
-                    // for debug.
-                    // println!("depth: {}, ident_name: {}, block_str: {}", k, vv, kk);
-                }
-            }
-            break;
-        }
+    for node in nodes.as_mut() as &mut Vec<Node> {
+        read_node(node, &mut arg);
     }
-
     let root_node = Node {
         kind: NodeKind::ND_BLOCK,
         fn_blocks: nodes,
@@ -73,11 +37,12 @@ fn set_block_str_and_create_localval_table(f: &mut Function) {
     };
     f.root_node = root_node;
     f.lv_size = arg.val_size;
+    return;
 }
 
-// A structure that summarizes the information that is passed 
+// A structure that summarizes the information that is passed
 // to the read_node().
-// 
+//
 // Currently, this struct is used mainly for labeling block-node
 // to specify variable scopes.
 struct ReadNodeArgs {
@@ -85,7 +50,7 @@ struct ReadNodeArgs {
     index: Vec<usize>,
     // current block-node depth.
     depth: usize,
-    // hold current blc_str. 
+    // hold current blc_str.
     cur_str: String,
     // current function's all variables. See IdentDir-struct part.
     ident_dir: IdentDir,
@@ -107,45 +72,52 @@ impl ReadNodeArgs {
 // IdentDir store all variable in current function.
 // For each block-node depth, it holds hashmap of ident table.
 pub struct IdentDir {
-    pub dir: Box<HashMap<usize, IdentTable>>
+    pub dir: Box<HashMap<usize, IdentTable>>,
 }
 
 type IdentTable = HashMap<BlockStr, Symbol>;
 
-// BlockStr is kind like hash value which should be unique in 
+// BlockStr is kind like hash value which should be unique in
 // the same block-node depth. This hash value is determined by depth and index.
 // Actual block_str example is below.
 //
 // [example]
-// 
-/*  
-    main() {
-    // here, block_str is `_1` (depth: 1)
+//
+// main() {
+//  // here, block_str is `_1` (depth: 1)
+//
+//     {
+//         // here, block_str is `_1_1` (index:1, depth:2)
+//         {
+//             // here, block_str is `_1_1_1` (index:1, depth:3)
+//         }
+//         {
+//             // here, block_str is `_1_1_2` (index:2, depth:3)
+//             {
+//
+//             }
+//             {
+//                 // here, block_str is `_1_1_2_2` (index:2, depth:4)
+//             }
+//         }
+//     }
+//     {
+//         // here, block_str is `_1_2` (index:1, depth:2)
+//     }
+// }
+pub type BlockStr = String;
 
-        {
-            // here, block_str is `_1_1` (index:1, depth:2)
-            {
-                // here, block_str is `_1_1_1` (index:1, depth:3)
-            }
-            {
-                // here, block_str is `_1_1_2` (index:2, depth:3)
-                {
-
-                }
-                {
-                    // here, block_str is `_1_1_2_2` (index:2, depth:4)
-                }
-            }
-        }
-        {
-            // here, block_str is `_1_2` (index:1, depth:2)
-        }
+// build blockStr from current depth and index.
+fn build_block_str(depth: usize, index: &Vec<usize>) -> String {
+    let mut base = String::from("");
+    for i in 1..=depth {
+        base.push_str(format!("_{}", index[i]).as_str())
     }
-*/
-type BlockStr = String;
+    return base;
+}
 
 // symbol is variable's symbol
-type Symbol = String; 
+pub type Symbol = String;
 
 impl IdentDir {
     pub fn new() -> Self {
@@ -171,8 +143,8 @@ impl IdentDir {
 
 fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     /*
-        idnet node.
-     */
+       idnet node.
+    */
     if node.kind == NodeKind::ND_IDENT {
         // そのidentが作成されたblockを示す、block_strを入れる.
         node.block_str = arg.cur_str.clone();
@@ -183,66 +155,33 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
 
         // increment arg.size according to its variable type.
         arg.val_size += 1;
-        
+
         return;
     }
-
-    /*
-        block node.
-     */
-    /*  main() {
-        // ここのblockは `_1` (depth: 1)
-
-            {
-                // ここのblockは `_1_1` (index:1, depth:2)
-                {
-                    // ここのblockは `_1_1_1` (index:1, depth:3)
-                }
-                {
-                    // ここのblockは `_1_1_2` (index:2, depth:3)
-                    {
-
-                    }
-                    {
-                        // ここのblockは `_1_1_2_2` (index:2, depth:4)
-                    }
-                }
-            }
-            {
-                // ここのblockは `_1_2` (index:1, depth:2)
-            }
-        }
-    */
     if node.kind == NodeKind::ND_BLOCK {
-        let mut i = 0;
-        // depth = 1
         arg.depth += 1;
-        // index[1] = 1
         arg.index[arg.depth] += 1;
-        arg.cur_str = block_str_from_index(arg.depth.clone(), &arg.index);
-        loop {
-            if i == node.block_stmts_len {
-                break;
-            }
-            read_node(&mut node.block_stmts[i], arg);
-            i += 1;
+        arg.cur_str = build_block_str(arg.depth, &arg.index);
+
+        for block_stmt in node.block_stmts.as_mut() as &mut Vec<Node> {
+            read_node(block_stmt, arg);
         }
+
         // depth以下の情報は破棄する.
         for i in (arg.depth + 1)..10 {
             arg.index[i] = 0;
         }
         arg.depth -= 1;
-        arg.cur_str = block_str_from_index(arg.depth.clone(), &arg.index);
+        arg.cur_str = build_block_str(arg.depth, &arg.index);
         return;
     }
     if node.kind == NodeKind::ND_NUM {
         return;
     }
 
-
     /*
-        nodes that have next node in left side.
-     */
+       nodes that have next node in left side.
+    */
     if node.kind == NodeKind::ND_EXPR
         || node.kind == NodeKind::ND_STMT
         || node.kind == NodeKind::ND_RETURN
@@ -255,8 +194,8 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     }
 
     /*
-        irregular nodes that don't have next node neither in left nor right.
-     */
+       irregular nodes that don't have next node neither in left nor right.
+    */
     // for for_stmt
     if node.kind == NodeKind::ND_FOR {
         read_node(&mut node.for_node_first_assign.as_mut().unwrap(), arg);
@@ -287,13 +226,4 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     read_node(&mut node.l.as_mut().unwrap(), arg);
     read_node(&mut node.r.as_mut().unwrap(), arg);
     return;
-}
-
-// depth = 1, index[1] = 1
-fn block_str_from_index(depth: usize, index: &Vec<usize>) -> String {
-    let mut base = String::from("");
-    for i in 1..=depth {
-        base.push_str(format!("_{}", index[i]).as_str())
-    }
-    return base;
 }

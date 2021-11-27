@@ -1,3 +1,4 @@
+use crate::intermediate_process::FunctionLocalVariable;
 use crate::tokenize::{TokenKind, TokenReader, Type};
 
 #[derive(Clone)]
@@ -7,6 +8,8 @@ pub struct Function {
     // The local variable size, to which the processor lower,
     // when this function called.
     pub lv_size: usize,
+
+    pub local_variable: FunctionLocalVariable,
 }
 impl Function {
     pub fn new(root_node: Node) -> Function {
@@ -14,6 +17,8 @@ impl Function {
             root_node: root_node,
             // TODO: calc lv from nodes.
             lv_size: 0,
+
+            local_variable: FunctionLocalVariable::new(),
         };
     }
 }
@@ -48,6 +53,8 @@ pub struct Node {
 
     // for creating block_str
     pub block_str: String,
+    // IdentID
+    pub ident_id: String,
 
     // 変数宣言nodeの
     pub decl_type: Type,
@@ -80,6 +87,7 @@ impl Default for Node {
             block_stmts_len: 0,
             fn_name: String::new(),
             block_str: String::new(),
+            ident_id: String::new(),
             decl_type: Type::None,
             fn_type: Type::None,
             fn_ident: String::new(),
@@ -136,11 +144,14 @@ fn gen_num_node(tok: &mut TokenReader) -> Option<Box<Node>> {
         tok.next();
         return node;
     }
-    tok.error(String::from(format!(
-        "expect num token, but got {:?}.",
-        tok.cur_tok().kind
-    )));
-    panic!();
+    tok.error(
+        tok.cur_input_pos(),
+        String::from(format!(
+            "expect num token, but got {:?}.",
+            tok.cur_tok().kind
+        )),
+        tok.cur_tok_len(),
+    );
 }
 
 fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>> {
@@ -222,8 +233,11 @@ fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
     // 今はfoo()という、引数なしの関数しか許していない.
 
     if tok.cur_tok().char != ")" {
-        tok.error(String::from("expect `)`, but not."));
-        panic!("");
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("expect `)`, but not."),
+            tok.cur_tok_len(),
+        );
     }
     // `)`の次のtokenを指すように.
     tok.next();
@@ -243,8 +257,11 @@ fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
             return gen_ident_node(tok);
         }
     } else {
-        tok.error(String::from("expect TokenKind::IDENT, but not."));
-        panic!("");
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("expect TokenKind::IDENT, but not."),
+            tok.cur_tok_len(),
+        );
     }
 }
 
@@ -338,14 +355,20 @@ fn parse_elsif(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().char == "(" {
         node = parse_ifcond(tok.next_tok())
     } else {
-        tok.error(String::from("parse if err."));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse if err."),
+            tok.cur_tok_len(),
+        );
     }
     if tok.cur_tok().char == ")" {
         node = gen_elsif_node(node, parse_stmts2(tok.next_tok()));
     } else {
-        tok.error(String::from("parse if err."));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse if err."),
+            tok.cur_tok_len(),
+        );
     }
     return node;
 }
@@ -369,14 +392,20 @@ fn parse_if(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().char == "(" {
         node = parse_ifcond(tok.next_tok());
     } else {
-        tok.error(String::from("parse if err."));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse if err."),
+            tok.cur_tok_len(),
+        );
     }
     if tok.cur_tok().char == ")" {
         node = gen_if_node(node, parse_stmts2(tok.next_tok()));
     } else {
-        tok.error(String::from("parse if err."));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse if err."),
+            tok.cur_tok_len(),
+        );
     }
     return node;
 }
@@ -449,34 +478,49 @@ fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
 
         node.for_node_first_assign = parse_declare(tok.next_tok(), t);
     } else {
-        tok.error(String::from("parse for err.(expect `(`)"));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse for err.(expect `(`)"),
+            tok.cur_tok_len(),
+        );
     }
     if tok.cur_tok().char == ";" {
         node.for_node_second_condition = parse_equality(tok.next_tok());
     } else {
-        tok.error(String::from("parse for err.(expect `;`)"));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse for err.(expect `;`)"),
+            tok.cur_tok_len(),
+        );
     }
     if tok.cur_tok().char == ";" {
         node.for_node_third_expr = parse_expr(tok.next_tok());
     } else {
-        tok.error(String::from("parse for err.(expect `;`)"));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse for err.(expect `;`)"),
+            tok.cur_tok_len(),
+        );
     }
 
     if tok.expect(";") {
         tok.next_tok();
     } else {
-        tok.error(String::from("parse for err.(expect `;`)"));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse for err.(expect `;`)"),
+            tok.cur_tok_len(),
+        );
     }
 
     if tok.cur_tok().char == ")" {
         node.for_node_stmts = parse_stmts2(tok.next_tok());
     } else {
-        tok.error(String::from("parse for err.(expect `)`"));
-        panic!();
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("parse for err.(expect `)`"),
+            tok.cur_tok_len(),
+        );
     }
     return Some(node);
 }
@@ -551,15 +595,6 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
             node = parse_equality(tok);
         }
     };
-    // if tok.cur_tok().kind == TokenKind::TYPE {
-    //     node = parse_declare(tok);
-    // } else if tok.cur_tok().kind == TokenKind::IDENT && tok.get_next_tok().char == "=" {
-    //     node = parse_assign(tok);
-    // } else if tok.cur_tok().kind == TokenKind::RETURN {
-    //     node = parse_return(tok);
-    // } else {
-    //     node = parse_equality(tok);
-    // }
 
     // MEMO: ここではcurは";"を指している.
     if tok.expect(";") {
@@ -567,9 +602,11 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         // MEMO: ここではcurは";"の次を指している.
         return node;
     }
-
-    tok.error(String::from("expect ';', but not found."));
-    panic!("");
+    tok.error(
+        tok.cur_input_pos(),
+        String::from("expect ';', but not found."),
+        tok.cur_tok_len(),
+    );
 }
 
 // block = "{" stmts* "}"
@@ -629,7 +666,11 @@ fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
 fn parse_function(tok: &mut TokenReader) -> Function {
     let t = match tok.cur_tok().kind {
         TokenKind::TYPE(t) => t,
-        _ => panic!("expected type!!"),
+        _ => tok.error(
+            tok.cur_tok().input_pos(),
+            String::from("Expected Type!!"),
+            tok.cur_tok().len(),
+        ),
     };
 
     let fn_ident = gen_ident_node(tok.next_tok());
@@ -637,7 +678,11 @@ fn parse_function(tok: &mut TokenReader) -> Function {
     if tok.cur_tok().char == "(" && tok.get_next_tok().char == ")" {
         tok.next_nth_tok(3);
     } else {
-        panic!("Invalid format.")
+        tok.error(
+            tok.cur_input_pos(),
+            String::from("expect `()`, but not."),
+            tok.cur_tok_len(),
+        );
     }
 
     // MEMO: 純正のNodeを返すように.

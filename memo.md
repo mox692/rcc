@@ -129,7 +129,15 @@ if (a < 1) {
 * codegen
   * IDENT_NODEをcodegen時、parameterをkeyに
   * 変数を評価するとき(変数名で検索をかける)、現在のblockから順番に、上の深さに向かって検索していく
-
+    * parse -> tokenReaderにtokのindexをcountさせるようにしといて、そこからErr位置を特定ルウ
+    * intermedeate -> 変数重複
+      * a
+    * codegen -> internalErr?(userErrはintermedeateで全て弾きたい)
+    * 全部intermedeateに寄せれない？
+      * codegenでやってること
+        * label (これのErrって、そもそもcompilerの問題せつだから別で考えてもいいかも)
+        * 変数表、offsetの管理
+        * シンボル重複、未定義check
 ### Current Syntax
 ```
 source = program

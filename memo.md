@@ -60,6 +60,28 @@
 * block scopeがやっとできたーーー
 * 次はちょっと一旦refactorしたい.
 
+12/16
+* func callの実装やる
+  * func call nodeの追加 (tokenは新しく追加する必要はなさげ)
+    * nodeが持つべきdata
+      * lv_size
+      * jmp先のlabelかaddr
+  * nodeに対しての命令
+    * prologue
+      * rspとrbpの調整
+      * functionのrsp引き下げサイズを把握しておく必要があるな
+    * call命令
+    * retの埋め込み
+    * (関数宣言の時にだけど)local変数みたいに、labelを付与しておく必要がある
+  
+12/18
+* funccallの続き
+  * red zoneの存在を一昨日くらいに初めて知って、少し調査してる
+  * 参考(red zoneで調べてたらいっぱい出てくる)
+    * https://kogara324.hatenablog.com/entry/2019/05/02/045056
+    * この挙動はサポートしなくてもいいかもしれない
+    * とりあえずlocal変数分stackpointerを下げる挙動にしてみる
+
 ### TODO
 * 複数のfunctionをparseできるように
   * `int hoge() {}`という構文を新しく追加する必要がある.
@@ -141,7 +163,7 @@ if (a < 1) {
 ### Current Syntax
 ```
 source = program
-program = function
+program = function*
 function = int ident "(" ")" block
 stmts = ( stmts2 | ifstmt | forstmt)
 stmts2 = block | stmt
@@ -161,12 +183,16 @@ assign = &ident "=" equality
 expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
-unary = &num | &ident | &ident "(" ")"
+unary = &num | &ident | fn_call
+fn_call = &ident "(" ")"
 ```
 
 * 更新
   * 1105: block node追加
   * 1116: intの変数宣言.
   * 1117: parserの処理対象をfunctionに変更
+  * 1216: function callに対応の予定
 
   
+### 設計の後悔
+* NodeをOption<Box<Node>>にしたのはマジでミスだった.

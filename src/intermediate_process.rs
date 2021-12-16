@@ -277,6 +277,7 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     }
     // for fncall
     if node.kind == NodeKind::ND_FNCALL {
+        // 関数名を渡して、呼び出し先の関数のLabel名をNodeのjmp_fn_labelにおく
         return;
     }
 

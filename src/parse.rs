@@ -3,6 +3,7 @@ use crate::tokenize::{TokenKind, TokenReader, Type};
 
 #[derive(Clone)]
 pub struct Function {
+    pub fn_name: String,
     // Root Function Node
     pub root_node: Node,
     // The local variable size, to which the processor lower,
@@ -12,8 +13,9 @@ pub struct Function {
     pub local_variable: FunctionLocalVariable,
 }
 impl Function {
-    pub fn new(root_node: Node) -> Function {
+    pub fn new(root_node: Node, fn_name: String) -> Function {
         return Function {
+            fn_name: fn_name,
             root_node: root_node,
             // TODO: calc lv from nodes.
             lv_size: 0,
@@ -45,6 +47,7 @@ pub struct Node {
     pub for_node_third_expr: Option<Box<Node>>,
     pub for_node_stmts: Option<Box<Node>>,
 
+    // for fn_call_node
     pub fn_name: String,
 
     // for block
@@ -673,7 +676,8 @@ fn parse_function(tok: &mut TokenReader) -> Function {
         ),
     };
 
-    let fn_ident = gen_ident_node(tok.next_tok());
+    let fn_ident_node = gen_ident_node(tok.next_tok());
+    let fn_name = fn_ident_node.unwrap().as_ref().str.clone();
 
     if tok.cur_tok().char == "(" && tok.get_next_tok().char == ")" {
         tok.next_nth_tok(3);
@@ -695,16 +699,21 @@ fn parse_function(tok: &mut TokenReader) -> Function {
     let n = Node {
         kind: NodeKind::ND_ROOT,
         fn_blocks: fn_block_nodes.block_stmts,
+        fn_name: fn_name.clone(),
         ..Default::default()
     };
-    let function = Function::new(n);
+    let function = Function::new(n, fn_name.clone());
     return function;
 }
 
-// program = function
-fn parse_program(tok: &mut TokenReader) -> Function {
-    let f = parse_function(tok);
-    return f;
+// program = functions*
+fn parse_program(tok: &mut TokenReader) -> Vec<Function> {
+    let mut func_vec:Vec<Function> = vec![];
+    // continue read until EOF token found.
+    while tok.cur_tok().kind != TokenKind::EOF {
+        func_vec.push(parse_function(tok))
+    }
+    return func_vec;
 }
 
 // generate several nodes, and return Function.
@@ -712,12 +721,7 @@ fn parse_program(tok: &mut TokenReader) -> Function {
 pub fn parse(tok: &mut TokenReader) -> Vec<Function> {
     // TODO: ini tok要る?
     consume_initial_tok(tok);
-    let function = parse_program(tok);
-
-    // TODO: 文法を変えて、複数のfunctionをparseできるように.
-    //       今は手動でVec<Function>を返すようにしてる
-    let fv = vec![function];
-    return fv;
+    return parse_program(tok);
 }
 
 pub fn consume_initial_tok(tok: &mut TokenReader) {
@@ -732,7 +736,8 @@ pub fn debug_functions(flag: bool, functions: &Vec<Function>) {
     if !flag {
         return;
     }
-    for function in functions.iter() {
+    for (i, function) in functions.iter().enumerate() {
+        println!("{}'th function...", i);
         debug_nodes(&function.root_node.fn_blocks);
     }
 }

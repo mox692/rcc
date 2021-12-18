@@ -20,22 +20,23 @@ impl CodeLabel {
 }
 
 pub fn codegen(functions: Vec<Function>) {
+    let mut output_file = create_file("./gen.s");
+    writeln!(output_file, ".text");
     for f in functions.iter() {
-        codegen_func(f.clone());
+        codegen_func(f.clone(), &mut output_file);
     }
 }
 
-pub fn codegen_func(function: Function) {
+pub fn codegen_func(function: Function, f: &mut File) {
     let root_node = &function.root_node;
 
     // let mut lv = LocalVariable::new();
     let mut lv = function.local_variable;
     let mut cl = CodeLabel::new();
-    let mut f = create_file("./gen.s");
+
     // put start up.
-    writeln!(f, ".text");
-    writeln!(f, ".global main");
-    writeln!(f, "main:");
+    writeln!(f, ".global {}", function.fn_name);
+    writeln!(f, "{}:", function.fn_name);
     writeln!(f, "pushq %rbp");
     writeln!(f, "movq %rsp, %rbp");
 
@@ -55,7 +56,7 @@ pub fn codegen_func(function: Function) {
     // TODO: 将来的には(Nodeというより)Function毎にcodegenをしていくイメージ.
     //       また、関数ごとに(上で書いている様な)prologue,epilogueの処理を入れる.
     for node in root_node.fn_blocks.clone() {
-        gen(&node, &mut f, &mut lv, &mut cl);
+        gen(&node, f, &mut lv, &mut cl);
     }
 
     writeln!(f, "pop %rax");
@@ -103,10 +104,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         return;
     }
     if node.kind == NodeKind::ND_FNCALL {
-        // TODO: まだ関数呼び出しができない.
-        //       関数呼び出しを見つけると、codegeneratorは
-        //       stackに0をpushする.(どんな関数呼び出しも0として評価される.)
-        writeln!(f, "push $0");
+        writeln!(f, "call {}", node.fn_name);
+        writeln!(f, "push %rax");
         return;
     }
 

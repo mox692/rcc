@@ -169,17 +169,33 @@ int main() {
 " 3
 
 test "
-int main() {
-    if(6>3) {
-        int b = 4;
-        if(6>3) {
-            if(6>3) {
-                if(6>3) {
-                    b = 2;
-                }
-            }
-        }
-        return b;
-    }
+int foo(){return 3;} int bar() { if(3 > 2) {3;}} int main(){ return 3;}
+" 3
+
+test "
+int foo() {
+    return 98;
 }
-" 2 
+
+int main() {
+    int a = foo();
+    return a + 44;
+}
+" 142
+
+### TO BE FIXED (forの3つめがexprじゃなくて,stmtサポート?)
+# test "
+# int foo() {
+#     int a = 3;
+#     int d = 1;
+#     return a + d;
+# }
+
+# int main() {
+#     int a = foo();
+#     for(int i = 0; i < 3; i = 1 + i;) {
+#         a = a + foo;
+#     }
+#     return a;
+# }
+# " 12

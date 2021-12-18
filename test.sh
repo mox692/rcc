@@ -76,7 +76,7 @@ test "int main(){if (2 > 5) 33; else 4; }" 4
 test "int main(){if (2 > 5) 33; else int a = 4; return a;}" 4
 
 # for statement.
-test "int main(){for (int a = 2;  10 < 3; 3+2;) {int b = 3; 2; return b;}}" 3
+test "int main(){for (int a = 2;  10 < 3; 3+2;) {int b = 3; 2; return b;} return 10;}" 10
 # test "int main(){for (int a = 2;  10 < 3; 3+2;){3;} for(int c = 0; c > 10; 3;){int d = 3; 2;} return d;}" 3 -> will panic.
 
 # block
@@ -183,19 +183,27 @@ int main() {
 }
 " 142
 
-### TO BE FIXED (forの3つめがexprじゃなくて,stmtサポート?)
-# test "
-# int foo() {
-#     int a = 3;
-#     int d = 1;
-#     return a + d;
-# }
+test "
+int main() {
+    int sum = 0;
+    for(int i = 0; i < 3; i = i + 1;) {
+        sum = sum + i;
+    }
+    return sum;
+}
+" 3
+test "
+int foo() {
+    int a = 3;
+    int d = 1;
+    return a + d;
+}
 
-# int main() {
-#     int a = foo();
-#     for(int i = 0; i < 3; i = 1 + i;) {
-#         a = a + foo;
-#     }
-#     return a;
-# }
-# " 12
+int main() {
+    int a = foo();
+    for(int i = 0; i < 3; i = 1 + i;) {
+        a = a + foo();
+    }
+    return a;
+}
+" 16

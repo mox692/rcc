@@ -158,12 +158,12 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
 
         gen(node.for_node_first_assign.as_ref().unwrap(), f, lv, cl);
         writeln!(f, ".{}:", for_start_label);
-        gen(node.for_node_stmts.as_ref().unwrap(), f, lv, cl);
         gen(node.for_node_second_condition.as_ref().unwrap(), f, lv, cl);
         writeln!(f, "pop %rax");
         writeln!(f, "mov $1, %rdi");
         writeln!(f, "cmp %rdi, %rax");
         writeln!(f, "jne .{}", for_end_label);
+        gen(node.for_node_stmts.as_ref().unwrap(), f, lv, cl);
         gen(node.for_node_third_expr.as_ref().unwrap(), f, lv, cl);
         writeln!(f, "jmp .{}", for_start_label);
         writeln!(f, ".{}:", for_end_label);

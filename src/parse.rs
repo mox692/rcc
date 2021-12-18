@@ -465,7 +465,7 @@ fn parse_ifstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     }
 }
 
-// forstmt = "for" "(" declare ";" equality ";" expr ")" stmts
+// forstmt = "for" "(" declare ";" equality ";" expr | assign ")" stmts2
 fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Box<Node> = Box::new(Node {
         kind: NodeKind::ND_FOR,
@@ -497,7 +497,13 @@ fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         );
     }
     if tok.cur_tok().char == ";" {
-        node.for_node_third_expr = parse_expr(tok.next_tok());
+        // assignの時
+        if tok.get_next_nth_tok(2).char == "=" {
+            node.for_node_third_expr = parse_assign(tok.next_tok());
+        } else {
+            // exprの時
+            node.for_node_third_expr = parse_expr(tok.next_tok());
+        }
     } else {
         tok.error(
             tok.cur_input_pos(),

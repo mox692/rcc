@@ -207,3 +207,41 @@ int main() {
     return a;
 }
 " 16
+
+test "
+int rec(int a, int b, int c) {
+    return a + b + c;
+}
+int main() {
+    int b = rec(2, 4 ,44);
+    return b;
+}
+" 50
+
+test "
+int foo(int a) {
+    return a * 2;
+}
+int bar(int b) {
+    return b * b;
+}
+int main() {
+    int a = foo(4) + bar(2);
+    return a;
+}
+" 12
+
+test "
+int fib(int n) {
+    if(n == 0) {
+        return 0;
+    }
+    if(n == 1) {
+        return 1;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+int main() {
+    return fib(4);
+}
+" 3

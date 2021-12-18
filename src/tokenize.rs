@@ -149,6 +149,14 @@ pub enum Type {
     None,
     INT,
 }
+impl Type {
+    pub fn size(&self) -> usize {
+        match &self {
+            Type::INT => 8,
+            _ => panic!("unknown size")
+        }
+    }
+}
 
 // read chars from lexer' current position and if it matches some specific string,
 // then return it as Token.
@@ -188,6 +196,8 @@ fn read_punct(l: &mut Lexer) -> Token {
         return Token::new_token(TokenKind::PUNCT, 0, String::from("{"), l.cur_pos());
     } else if l.expect_and_read("}") {
         return Token::new_token(TokenKind::PUNCT, 0, String::from("}"), l.cur_pos());
+    } else if l.expect_and_read(",") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from(","), l.cur_pos());
     }
     panic!("");
 }

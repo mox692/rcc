@@ -168,7 +168,7 @@ function = int ident "(" ")" block
 stmts = ( stmts2 | ifstmt | forstmt)
 stmts2 = block | stmt
 block = "{" stmts* "}"
-forstmt = "for" "(" declare ";" equality ";" expr ")" stmts2
+forstmt = "for" "(" declare ";" equality ";" expr | assign ")" stmts2
 ifstmt = "if" if_node ( elsif_node )? ( else_node )?
 if_node = "(" if_cond ")" stmts2
 elsif_node = "else if" "(" if_cond ")" stmts2
@@ -192,6 +192,7 @@ fn_call = &ident "(" ")"
   * 1116: intの変数宣言.
   * 1117: parserの処理対象をfunctionに変更
   * 1216: function callに対応の予定
+  * 12/18: forのバグ修正による変更(3つめのblockを assign | expr にした)
 
   
 ### 設計の後悔

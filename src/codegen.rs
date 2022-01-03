@@ -1,5 +1,7 @@
 use crate::intermediate_process::blockstr_to_identid;
 use crate::intermediate_process::FunctionLocalVariable;
+use crate::intermediate_process::build_block_str;
+use crate::intermediate_process::FN_ARG_BLOC_STR;
 use crate::parse::Function;
 use crate::parse::Node;
 use crate::parse::NodeKind;
@@ -31,7 +33,7 @@ pub fn codegen_func(function: Function, f: &mut File) {
     let root_node = &function.root_node;
 
     // let mut lv = LocalVariable::new();
-    let mut lv = function.local_variable;
+    let mut lv = function.local_variable.clone();
     let mut cl = CodeLabel::new();
 
     // put start up.
@@ -42,15 +44,29 @@ pub fn codegen_func(function: Function, f: &mut File) {
 
     // MEMO: rspを下げるサイズは必ず16の倍数にならないといけないらしいので
     //       それ用に返す値を少しいじってる.
+    //       今はInt型しかないので、これで大丈夫。
     writeln!(
         f,
         "sub ${}, %rsp",
-        if function.lv_size % 2 == 0 {
-            8 * function.lv_size
+        if (function.lv_size + function.fn_args_size) % 16 == 0 {
+            function.lv_size + function.fn_args_size
         } else {
-            (function.lv_size + 1) * 8
+            8 + function.lv_size + function.fn_args_size
         }
     );
+
+    // 関数の引数をmemに配置する
+    for (i, arg) in function.fn_args.iter().cloned().enumerate() {
+        let reg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+        let ident_id =
+        blockstr_to_identid(arg.sym.clone(), String::from(FN_ARG_BLOC_STR));
+
+        let offset = function.local_variable.get_val_offset_by_identid_recursively(ident_id)
+                                                   .unwrap_or_else(|| panic!("symbol: {} not found", arg.sym.clone()));
+
+        writeln!(f, "mov %{}, -{}(%rbp)", reg[i], offset);
+    }
+
 
     // 各stmt毎にcodegen.
     // TODO: 将来的には(Nodeというより)Function毎にcodegenをしていくイメージ.
@@ -58,7 +74,6 @@ pub fn codegen_func(function: Function, f: &mut File) {
     for node in root_node.fn_blocks.clone() {
         gen(&node, f, &mut lv, &mut cl);
     }
-
     writeln!(f, "pop %rax");
     writeln!(f, "mov %rbp, %rsp");
     writeln!(f, "pop %rbp");
@@ -92,18 +107,38 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        let offset = lv
+        if let Some(offset) = lv
             .get_val_offset_by_identid_recursively(blockstr_to_identid(
                 node.str.clone(),
                 node.block_str.clone(),
-            ))
-            .unwrap_or_else(|| panic!("Undeclared symbol!!"));
-        writeln!(f, "lea -{}(%rbp), %rax", offset);
-        writeln!(f, "mov (%rax), %rax");
-        writeln!(f, "push %rax");
-        return;
+            )) {
+                writeln!(f, "lea -{}(%rbp), %rax", offset);
+                writeln!(f, "mov (%rax), %rax");
+                writeln!(f, "push %rax");
+                return;
+            }
+        
+        // 関数の引数を一応調べる(必要ないかも)
+        let ident_id =
+            blockstr_to_identid(node.str.clone(), String::from(FN_ARG_BLOC_STR));
+        if let Some(offset) = lv.get_val_offset_by_identid_recursively(ident_id) {
+            writeln!(f, "lea -{}(%rbp), %rax", offset);
+            writeln!(f, "mov (%rax), %rax");
+            writeln!(f, "push %rax");
+            return;
+        } else {
+            panic!("sym :{} not found.",node.str.clone())
+        }
     }
     if node.kind == NodeKind::ND_FNCALL {
+        let reg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+        // 引数をregisterにおく
+        for (i, arg) in node.fn_call_args.iter().cloned().enumerate() {
+            gen(arg.val.unwrap().as_ref(), f, lv, cl);
+            writeln!(f, "pop %rax");
+            writeln!(f, "mov %rax, %{}", reg[i]); // arg1
+        }
+
         writeln!(f, "call {}", node.fn_name);
         writeln!(f, "push %rax");
         return;

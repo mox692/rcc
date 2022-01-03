@@ -3,11 +3,14 @@ use std::collections::HashMap;
 use crate::parse::Function;
 use crate::parse::Node;
 use crate::parse::NodeKind;
+use crate::tokenize::Type;
 
 // IdentID is a unique label for Functino's local variable,
 // and generated from blockstr. This label holds variable's
 // scope information.
 pub type IdentID = String;
+
+pub const FN_ARG_BLOC_STR: &str = "_1";
 
 #[derive(Clone)]
 pub struct FunctionLocalVariable {
@@ -28,7 +31,7 @@ impl FunctionLocalVariable {
     // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
     // Errを返す.
     pub fn try_new_val_offset(&mut self, symbol: Symbol, blcstr: BlockStr) -> Result<usize, &str> {
-        let ident_id = blockstr_to_identid(symbol, blcstr.clone());
+        let ident_id = blockstr_to_identid(symbol.clone(), blcstr.clone());
         match self.get_val_offset_by_identid(ident_id.clone()) {
             // すでに同じsymbolが同じscope内で宣言されている.
             Some(_) => Err("Already Exist Symbol"),
@@ -48,12 +51,11 @@ impl FunctionLocalVariable {
     // Noneを返す.
     pub fn get_val_offset_by_identid_recursively(&self, ident_id: IdentID) -> Option<usize> {
         let depth = identid_to_depth(&ident_id);
-
+        
         let mut current_ident_id = ident_id.clone();
-        for _ in 0..=depth - 1 {
-            match self.val_table.get(&current_ident_id) {
-                Some(offset) => return Some(offset.clone()),
-                None => {}
+        for _ in 0..depth  {
+            if let Some(offset) = self.val_table.get(&current_ident_id) {
+                return Some(offset.clone())
             }
             // currentのdepthにない場合、current_ident_idを更新
             match upper_block_ident_id(&current_ident_id) {
@@ -152,7 +154,7 @@ impl ReadNodeArgs {
 pub type BlockStr = String;
 
 // build blockStr from current depth and index.
-fn build_block_str(depth: usize, index: &Vec<usize>) -> String {
+pub fn build_block_str(depth: usize, index: &Vec<usize>) -> String {
     let mut base = String::from("");
     for i in 1..=depth {
         base.push_str(format!("_{}", index[i]).as_str())
@@ -174,7 +176,7 @@ pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
     for f in fvec.iter() {
         let mut f_clone = f.clone();
 
-        // localのcount, label付け
+        // 関数の引数、およびのローカル変数をlocal_variableに格納
         set_block_str_and_create_localval_table(&mut f_clone);
 
         fvec_after_processed.push(f_clone);
@@ -182,11 +184,34 @@ pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
     return fvec_after_processed;
 }
 
+// arg.local_variableに関数の引数を入れちゃう
+fn register_fnargs_to_functionLocalVariable(
+    fn_args: HashMap<String, Type>,
+    arg: &mut ReadNodeArgs,
+) {
+    for (sym, typ) in fn_args.iter() {
+        let block_str = build_block_str(arg.depth, &arg.index);
+
+        if let Err(e) = arg
+            .local_variable
+            .try_new_val_offset(sym.clone(), block_str.clone())
+        {
+            panic!("errrrrrrr")
+        }
+    }
+}
+
 // Read the all nodes owned by Function and create variable table.
 // In addition, it counts size to which rsp lowered when called this function.
 fn set_block_str_and_create_localval_table(f: &mut Function) {
     let mut nodes = f.root_node.fn_blocks.clone();
     let mut arg = ReadNodeArgs::new();
+    // let func_args = f.root_node.fn_args.clone();
+    // let func_args_num = func_args.len();
+
+    // 関数の引数をFunctionLocalVariableに登録する
+    // register_fnargs_to_functionLocalVariable(func_args, &mut arg);
+
     for node in nodes.as_mut() as &mut Vec<Node> {
         read_node(node, &mut arg);
     }
@@ -195,9 +220,20 @@ fn set_block_str_and_create_localval_table(f: &mut Function) {
         fn_blocks: nodes,
         ..Default::default()
     };
+
+    // 関数の引数をlocal_variableに詰める
+    let mut local_variable= arg.local_variable.clone();
+    for (_, arg) in f.fn_args.iter().cloned().enumerate() {
+        // TODO: 関数の引数はdepth, index共に0とする(後にきちんと仕様としてどこかにまとめる)
+        let block_str = String::from(FN_ARG_BLOC_STR);
+        let _ = local_variable.try_new_val_offset(arg.sym.clone(), block_str)
+                              .unwrap_or_else(|e| panic!("Err: {}: Maybe symbol {} is duplicated in this function.", e, arg.sym));
+    }
+
+
     f.root_node = root_node;
     f.lv_size = arg.val_size;
-    f.local_variable = arg.local_variable;
+    f.local_variable = local_variable;
     return;
 }
 
@@ -214,7 +250,8 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         // arg.local_variable.get_val_offset_by_identid_recursively(ident_id).unwrap_or_else(|| {println!("variable not found. {}", node.l.as_ref().unwrap().str); panic!("");});
 
         // increment arg.size according to its variable type.
-        arg.val_size += 1;
+        // TODO: 型を導入する時に改善/
+        arg.val_size += 8;
 
         return;
     }
@@ -277,7 +314,8 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     }
     // for fncall
     if node.kind == NodeKind::ND_FNCALL {
-        // 関数名を渡して、呼び出し先の関数のLabel名をNodeのjmp_fn_labelにおく
+                // TODO: 関数名を渡して、呼び出す関数の引数情報を抜いてきて、fn_callNodeに詰める
+        
         return;
     }
 

@@ -81,6 +81,50 @@
     * https://kogara324.hatenablog.com/entry/2019/05/02/045056
     * この挙動はサポートしなくてもいいかもしれない
     * とりあえずlocal変数分stackpointerを下げる挙動にしてみる
+* function argsの実装
+  * 文法の修正
+    * 関数宣言の時に、()内もparse
+      * これをlocal変数と同じように扱う
+      * (関数呼び出し時に使用する情報として、)
+    * caller関数呼び出し時に、引数を特定のレジスタに置くようなcodeを吐く
+    * calleeはレジスタに置かれた引数をstackにcopyする処理を追加
+
+* 関数引数のsupport、
+  * caller側のcode生成の対応(引数をrdiに入れる)
+  * callee側のsupprot(genの前に関数の引数だけregisterからstackに配置しておく)
+  * local変数は、intermediate_process.rs内で、関数の引数の後ろに置かれるようになってるはずだから、これでうまく動くはず！....
+
+* 12/20
+  * 関数をcodegenする際に引数を表すNodeを含める必要があある気がする.
+    * 1. globalなfunction tableみたいなのを作成して、codegenから関数名でaccessできるようにsルウ
+    * 2. fn_callnode自体に、引数の情報を持たせるように知る
+      * parseの段階は他の関数が見えないから、intermediateで他の関数の引数情報を引っ張ってkルウようにしたい
+      * nodeだけparseで作っておいた方がいいかもにした方がいいかも
+  * todo
+    * fn_call nodeの追加
+      * vecでnodeをもつ(a, 34, &bとかが入るよてい)
+      * 関数名から他のfnの引数情報を取ってくる
+        * fnの引数の情報整理も必要かも
+          * args構造体でも作るか
+            * type
+
+1/3
+* 関数の引数をsupportするようにするぞーーー
+* 以下をpassさせる
+```
+test "
+int rec(int a) {
+    return a;
+}
+int main() {
+    int b = rec(5);
+    return b;
+}
+" 5
+```
+* TODO:
+  * 宣言とcallにおいて、引数をparseできるように
+  * 
 
 ### TODO
 * 複数のfunctionをparseできるように
@@ -89,6 +133,8 @@
 * function callをできるように.
   * `hoge()`でhogeの定義にjmpするように
   * local変数の時と同様に、fucntion table的なものを作成した方がいいかも
+
+* print関数を提供する
       
 * Error msgを豊富にする.
 * local valのdebug機構
@@ -164,7 +210,7 @@ if (a < 1) {
 ```
 source = program
 program = function*
-function = int ident "(" ")" block
+function = int ident "(" ( &type &ident "," )* ")" block
 stmts = ( stmts2 | ifstmt | forstmt)
 stmts2 = block | stmt
 block = "{" stmts* "}"
@@ -184,7 +230,7 @@ expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
 unary = &num | &ident | fn_call
-fn_call = &ident "(" ")"
+fn_call = &ident "(" (equality ,)* ")"
 ```
 
 * 更新
@@ -193,6 +239,7 @@ fn_call = &ident "(" ")"
   * 1117: parserの処理対象をfunctionに変更
   * 1216: function callに対応の予定
   * 12/18: forのバグ修正による変更(3つめのblockを assign | expr にした)
+  * 12/18: 関数引数supportによる変更
 
   
 ### 設計の後悔

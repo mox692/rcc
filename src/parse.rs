@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::intermediate_process::FunctionLocalVariable;
 use crate::tokenize::{TokenKind, TokenReader, Type};
 
@@ -6,22 +8,57 @@ pub struct Function {
     pub fn_name: String,
     // Root Function Node
     pub root_node: Node,
-    // The local variable size, to which the processor lower,
-    // when this function called.
+    // local変数だけのサイズ
     pub lv_size: usize,
 
     pub local_variable: FunctionLocalVariable,
+
+    pub fn_args: Vec<FnArgs>,
+    // 関数の引数だけのサイズ
+    pub fn_args_size: usize
 }
 impl Function {
-    pub fn new(root_node: Node, fn_name: String) -> Function {
+    // parse_function の段階で判明しているものは引数に渡している
+    pub fn new(root_node: Node, fn_name: String, fn_args: Vec<FnArgs>) -> Function {
+        let mut args_size = 0;
+        for (_, arg) in fn_args.iter().cloned().enumerate() {
+            args_size += arg.typ.size();
+        }
         return Function {
             fn_name: fn_name,
+            fn_args: fn_args,
+            fn_args_size: args_size,
             root_node: root_node,
             // TODO: calc lv from nodes.
             lv_size: 0,
-
             local_variable: FunctionLocalVariable::new(),
         };
+    }
+}
+
+// TODO: 他の型もsupportするようになったら、ここをもっと複雑にする
+type Value = i32;
+
+#[derive(Clone, Debug)]
+pub struct FnArgs {
+    pub sym: String,
+    pub typ: Type,
+    pub val: Option<Box<Node>>,
+}
+impl FnArgs {
+    pub fn new_for_caller(typ: Type, val: Option<Box<Node>>) -> Self {
+        return Self {
+            sym: String::from(""), // Not use
+            typ: typ,
+            val: val,
+        }
+    }
+    pub fn new_for_callee(sym: String, typ: Type) -> Self {
+        return Self {
+            sym: sym,
+            typ: typ,
+            val: None, // Not use
+        }
     }
 }
 
@@ -49,6 +86,7 @@ pub struct Node {
 
     // for fn_call_node
     pub fn_name: String,
+    pub fn_call_args: Vec<FnArgs>, // 引数の型と、具体的な値
 
     // for block
     pub block_stmts: Vec<Node>,
@@ -65,6 +103,7 @@ pub struct Node {
     // function
     pub fn_type: Type,
     pub fn_ident: String,
+    pub fn_callee_args: Vec<FnArgs>, // 変数名:型
     // root_nodeのみが保有するfield.
     pub fn_blocks: Vec<Node>, // BoxじゃないNode!!
 }
@@ -89,11 +128,13 @@ impl Default for Node {
             block_stmts: Vec::new(),
             block_stmts_len: 0,
             fn_name: String::new(),
+            fn_call_args:Vec::new(), 
             block_str: String::new(),
             ident_id: String::new(),
             decl_type: Type::None,
             fn_type: Type::None,
             fn_ident: String::new(),
+            fn_callee_args: Vec::new(),
             fn_blocks: Vec::new(),
         };
     }
@@ -222,29 +263,32 @@ fn gen_if_node(l: Option<Box<Node>>, r: Option<Box<Node>>) -> Option<Box<Node>> 
     }));
 }
 
-fn gen_fn_call_node(fn_name: String) -> Option<Box<Node>> {
+fn gen_fn_call_node(fn_name: String, fn_call_args: Vec<FnArgs>) -> Option<Box<Node>> {
     return Some(Box::new(Node {
         kind: NodeKind::ND_FNCALL,
         fn_name: fn_name,
+        fn_call_args: fn_call_args,
         ..Default::default()
     }));
 }
 
+// fn_call = &ident "(" (equality ,)* ")"
 fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
-    // TODO: 引数を読む処理.
-    // ...
-    // 今はfoo()という、引数なしの関数しか許していない.
-
-    if tok.cur_tok().char != ")" {
-        tok.error(
-            tok.cur_input_pos(),
-            String::from("expect `)`, but not."),
-            tok.cur_tok_len(),
-        );
+    let mut args: Vec<FnArgs> = vec![];
+    while tok.cur_tok().char != ")" {
+        // 区切りの`,`は読み飛ばす.
+        if tok.cur_tok().char == "," {
+            tok.next();
+            continue;
+        }
+        // TODO: argsのType Check
+        let arg = FnArgs::new_for_caller(Type::INT, parse_equality(tok));
+        args.push(arg);
     }
+
     // `)`の次のtokenを指すように.
     tok.next();
-    return gen_fn_call_node(fn_name);
+    return gen_fn_call_node(fn_name, args);
 }
 
 // unary = &num | &ident | &ident "(" ")"
@@ -671,7 +715,7 @@ fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// function = int ident "(" ")" block
+// function = int ident "(" ( &type &ident "," )* ")" block
 fn parse_function(tok: &mut TokenReader) -> Function {
     let t = match tok.cur_tok().kind {
         TokenKind::TYPE(t) => t,
@@ -685,15 +729,46 @@ fn parse_function(tok: &mut TokenReader) -> Function {
     let fn_ident_node = gen_ident_node(tok.next_tok());
     let fn_name = fn_ident_node.unwrap().as_ref().str.clone();
 
-    if tok.cur_tok().char == "(" && tok.get_next_tok().char == ")" {
-        tok.next_nth_tok(3);
-    } else {
+    if tok.cur_tok().char != "(" {
         tok.error(
             tok.cur_input_pos(),
-            String::from("expect `()`, but not."),
+            String::from("expect `(`, but not."),
             tok.cur_tok_len(),
         );
     }
+    tok.next();
+
+    // let mut func_args: HashMap<String, Type> = HashMap::new();
+    let mut func_args = vec![];
+    while tok.cur_tok().char != ")" {
+        let typ;
+        let sym;
+
+        if let TokenKind::TYPE(t) = tok.cur_tok().kind {
+            typ = t;
+        } else {
+            panic!("aaaaaaaa")
+        }
+        tok.next();
+        if let TokenKind::IDENT = tok.cur_tok().kind {
+            sym = tok.cur_tok().char;
+        } else {
+            panic!("aaaaaaaa")
+        }
+        tok.next();
+
+        let arg = FnArgs::new_for_callee(sym, typ);
+
+        func_args.push(arg);
+
+        match tok.cur_tok().char.as_str() {
+            "," => tok.next(),
+            ")" => (),
+            _ => panic!("invalid syntax"),
+        }
+    }
+
+    tok.next_nth_tok(2); // foo(){ -> この次を指す
 
     // MEMO: 純正のNodeを返すように.
     // MEMO: コード(Nodeが何もない時に、unwrap_or_elseがErrorになりそう.)
@@ -706,15 +781,16 @@ fn parse_function(tok: &mut TokenReader) -> Function {
         kind: NodeKind::ND_ROOT,
         fn_blocks: fn_block_nodes.block_stmts,
         fn_name: fn_name.clone(),
+        fn_callee_args: func_args.clone(),
         ..Default::default()
     };
-    let function = Function::new(n, fn_name.clone());
+    let function = Function::new(n, fn_name.clone(), func_args.clone());
     return function;
 }
 
 // program = functions*
 fn parse_program(tok: &mut TokenReader) -> Vec<Function> {
-    let mut func_vec:Vec<Function> = vec![];
+    let mut func_vec: Vec<Function> = vec![];
     // continue read until EOF token found.
     while tok.cur_tok().kind != TokenKind::EOF {
         func_vec.push(parse_function(tok))

@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use crate::parse::Function;
-use crate::parse::Node;
-use crate::parse::NodeKind;
-use crate::tokenize::Type;
+use crate::{
+    parse::{Function, Node, NodeKind},
+};
 
 // IdentID is a unique label for Functino's local variable,
 // and generated from blockstr. This label holds variable's
@@ -18,7 +17,7 @@ pub struct FunctionLocalVariable {
     pub val_table: HashMap<IdentID, usize>,
     // current offset address from rbp.
     // this value will be updated each time ident-node is found.
-    pub current_offset: usize,
+    current_offset: usize,
 }
 impl FunctionLocalVariable {
     pub fn new() -> Self {
@@ -30,12 +29,16 @@ impl FunctionLocalVariable {
     // block_strとsymbolから、idnet_idを作成する.
     // ident_idがすでにident_id_mapに存在していたら(つまり同じscopeにおいて同じシンボルが定義されていたら)、
     // Errを返す.
-    pub fn try_new_val_offset(&mut self, symbol: Symbol, blcstr: BlockStr) -> Result<usize, &str> {
+    pub fn try_new_val_offset(
+        &mut self,
+        symbol: Symbol,
+        blcstr: BlockStr,
+    ) -> Result<usize, &str> {
         let ident_id = blockstr_to_identid(symbol.clone(), blcstr.clone());
         match self.get_val_offset_by_identid(ident_id.clone()) {
             // すでに同じsymbolが同じscope内で宣言されている.
-            Some(_) => Err("Already Exist Symbol"),
-            None => {
+            | Some(_) => Err("Already Exist Symbol"),
+            | None => {
                 self.current_offset += 8;
                 self.val_table.insert(ident_id.clone(), self.current_offset);
                 return Ok(self.current_offset);
@@ -49,18 +52,21 @@ impl FunctionLocalVariable {
     // 同じblock内に検索しているsymbolがなかった場合、より浅いblockでの検索を
     // 繰り返す.最も浅いblock(関数のblock)にも該当するsymbolがなかった場合は
     // Noneを返す.
-    pub fn get_val_offset_by_identid_recursively(&self, ident_id: IdentID) -> Option<usize> {
+    pub fn get_val_offset_by_identid_recursively(
+        &self,
+        ident_id: IdentID,
+    ) -> Option<usize> {
         let depth = identid_to_depth(&ident_id);
-        
+
         let mut current_ident_id = ident_id.clone();
-        for _ in 0..depth  {
+        for _ in 0..depth {
             if let Some(offset) = self.val_table.get(&current_ident_id) {
-                return Some(offset.clone())
+                return Some(offset.clone());
             }
             // currentのdepthにない場合、current_ident_idを更新
             match upper_block_ident_id(&current_ident_id) {
-                Some(id) => current_ident_id = id,
-                None => {}
+                | Some(id) => current_ident_id = id,
+                | None => (),
             };
         }
         // 該当するsymbolがなかった際.
@@ -88,8 +94,8 @@ fn identid_to_depth(ident_id: &IdentID) -> usize {
 fn upper_block_ident_id(ident_id: &String) -> Option<String> {
     let mut v: Vec<&str> = ident_id.split("_").collect();
     match v.pop() {
-        None => return None,
-        Some(_) => {}
+        | None => return None,
+        | Some(_) => ()
     };
     return Some(v.join("_"));
 }
@@ -184,33 +190,11 @@ pub fn intermediate_process(fvec: Vec<Function>) -> Vec<Function> {
     return fvec_after_processed;
 }
 
-// arg.local_variableに関数の引数を入れちゃう
-fn register_fnargs_to_functionLocalVariable(
-    fn_args: HashMap<String, Type>,
-    arg: &mut ReadNodeArgs,
-) {
-    for (sym, typ) in fn_args.iter() {
-        let block_str = build_block_str(arg.depth, &arg.index);
-
-        if let Err(e) = arg
-            .local_variable
-            .try_new_val_offset(sym.clone(), block_str.clone())
-        {
-            panic!("errrrrrrr")
-        }
-    }
-}
-
 // Read the all nodes owned by Function and create variable table.
 // In addition, it counts size to which rsp lowered when called this function.
 fn set_block_str_and_create_localval_table(f: &mut Function) {
     let mut nodes = f.root_node.fn_blocks.clone();
     let mut arg = ReadNodeArgs::new();
-    // let func_args = f.root_node.fn_args.clone();
-    // let func_args_num = func_args.len();
-
-    // 関数の引数をFunctionLocalVariableに登録する
-    // register_fnargs_to_functionLocalVariable(func_args, &mut arg);
 
     for node in nodes.as_mut() as &mut Vec<Node> {
         read_node(node, &mut arg);
@@ -222,14 +206,19 @@ fn set_block_str_and_create_localval_table(f: &mut Function) {
     };
 
     // 関数の引数をlocal_variableに詰める
-    let mut local_variable= arg.local_variable.clone();
+    let mut local_variable = arg.local_variable.clone();
     for (_, arg) in f.fn_args.iter().cloned().enumerate() {
         // TODO: 関数の引数はdepth, index共に0とする(後にきちんと仕様としてどこかにまとめる)
         let block_str = String::from(FN_ARG_BLOC_STR);
-        let _ = local_variable.try_new_val_offset(arg.sym.clone(), block_str)
-                              .unwrap_or_else(|e| panic!("Err: {}: Maybe symbol {} is duplicated in this function.", e, arg.sym));
+        let _ = local_variable
+            .try_new_val_offset(arg.sym.clone(), block_str)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Err: {}: Maybe symbol {} is duplicated in this function.",
+                    e, arg.sym
+                )
+            });
     }
-
 
     f.root_node = root_node;
     f.lv_size = arg.val_size;
@@ -245,11 +234,6 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         // そのidentが作成されたblockを示す、block_strを入れる.
         // TODO: 多分使わなくなる
         node.block_str = arg.cur_block_str.clone();
-        // TODO: こっちがメインになる
-        // let ident_id = blockstr_to_identid(node.str.clone(),build_block_str(arg.depth, &arg.index));
-        // arg.local_variable.get_val_offset_by_identid_recursively(ident_id).unwrap_or_else(|| {println!("variable not found. {}", node.l.as_ref().unwrap().str); panic!("");});
-
-        // increment arg.size according to its variable type.
         // TODO: 型を導入する時に改善/
         arg.val_size += 8;
 
@@ -314,8 +298,6 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     }
     // for fncall
     if node.kind == NodeKind::ND_FNCALL {
-                // TODO: 関数名を渡して、呼び出す関数の引数情報を抜いてきて、fn_callNodeに詰める
-        
         return;
     }
 
@@ -323,10 +305,11 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         read binary_node.
     */
     if node.kind == NodeKind::ND_ASSIGN {
-        // TODO: get_val_offset_by_identid_recursively()で、既存のsymbolを探しにいく.
         let block_str = build_block_str(arg.depth, &arg.index);
-        let ident_id = blockstr_to_identid(node.l.as_ref().unwrap().str.clone(), block_str);
-        let offset = arg
+        let ident_id =
+            blockstr_to_identid(node.l.as_ref().unwrap().str.clone(), block_str);
+        // Err checkのため
+        let _ = arg
             .local_variable
             .get_val_offset_by_identid_recursively(ident_id)
             .unwrap_or_else(|| {
@@ -343,12 +326,15 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         let block_str = build_block_str(arg.depth, &arg.index);
         // TODO: declnにblockstrがひっついている構造
         node.block_str = block_str.clone();
-        let offset = match arg
+        // Err checkのため
+        let _ = match arg
             .local_variable
             .try_new_val_offset(node.l.as_ref().unwrap().str.clone(), block_str)
         {
-            Ok(v) => v,
-            Err(_) => panic!("Symbol duplicated."),
+            | Ok(v) => v,
+            | Err(_) => {
+                panic!("Symbol duplicated.")
+            }
         };
         read_node(&mut node.l.as_mut().unwrap(), arg);
         read_node(&mut node.r.as_mut().unwrap(), arg);

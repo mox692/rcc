@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-
-use crate::intermediate_process::FunctionLocalVariable;
-use crate::tokenize::{TokenKind, TokenReader, Type};
+use crate::{
+    intermediate_process::FunctionLocalVariable,
+    tokenize::{TokenKind, TokenReader, Type},
+};
 
 #[derive(Clone)]
 pub struct Function {
@@ -15,7 +15,7 @@ pub struct Function {
 
     pub fn_args: Vec<FnArgs>,
     // 関数の引数だけのサイズ
-    pub fn_args_size: usize
+    pub fn_args_size: usize,
 }
 impl Function {
     // parse_function の段階で判明しているものは引数に渡している
@@ -51,14 +51,14 @@ impl FnArgs {
             sym: String::from(""), // Not use
             typ: typ,
             val: val,
-        }
+        };
     }
     pub fn new_for_callee(sym: String, typ: Type) -> Self {
         return Self {
             sym: sym,
             typ: typ,
             val: None, // Not use
-        }
+        };
     }
 }
 
@@ -128,7 +128,7 @@ impl Default for Node {
             block_stmts: Vec::new(),
             block_stmts_len: 0,
             fn_name: String::new(),
-            fn_call_args:Vec::new(), 
+            fn_call_args: Vec::new(),
             block_str: String::new(),
             ident_id: String::new(),
             decl_type: Type::None,
@@ -317,21 +317,21 @@ fn parse_mul_div(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = parse_unary(tok);
     loop {
         match tok.cur_tok().char.as_str() {
-            "*" => {
+            | "*" => {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_MUL, // TODO: ND_IDENTも対応.
                     node,
                     parse_unary(tok.next_tok()),
                 )))
             }
-            "/" => {
+            | "/" => {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_DIV,
                     node,
                     parse_unary(tok.next_tok()),
                 )))
             }
-            _ => break,
+            | _ => break,
         }
     }
     return node;
@@ -343,21 +343,21 @@ fn parse_add_sub(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node = parse_mul_div(tok);
     loop {
         match tok.cur_tok().char.as_str() {
-            "+" => {
+            | "+" => {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_ADD,
                     node,
                     parse_mul_div(tok.next_tok()),
                 )))
             }
-            "-" => {
+            | "-" => {
                 node = Some(Box::new(gen_binary_node(
                     NodeKind::ND_SUB,
                     node,
                     parse_mul_div(tok.next_tok()),
                 )))
             }
-            _ => break,
+            | _ => break,
         };
     }
 
@@ -519,8 +519,8 @@ fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         // for(int a = 3;)
 
         let t = match tok.get_next_tok().kind {
-            TokenKind::TYPE(t) => t,
-            _ => panic!("fds"),
+            | TokenKind::TYPE(t) => t,
+            | _ => panic!("fds"),
         };
 
         node.for_node_first_assign = parse_declare(tok.next_tok(), t);
@@ -630,21 +630,21 @@ fn parse_declare(tok: &mut TokenReader, t: Type) -> Option<Box<Node>> {
 fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
     let mut node: Option<Box<Node>>;
     match tok.cur_tok().kind {
-        TokenKind::RETURN => {
+        | TokenKind::RETURN => {
             node = parse_return(tok);
         }
-        TokenKind::TYPE(t) => {
+        | TokenKind::TYPE(t) => {
             node = parse_declare(tok, t);
         }
         // equality or assign
-        TokenKind::IDENT => {
+        | TokenKind::IDENT => {
             if tok.get_next_tok().char == "=" {
                 node = parse_assign(tok);
             } else {
                 node = parse_equality(tok);
             }
         }
-        _ => {
+        | _ => {
             node = parse_equality(tok);
         }
     };
@@ -717,9 +717,9 @@ fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
 
 // function = int ident "(" ( &type &ident "," )* ")" block
 fn parse_function(tok: &mut TokenReader) -> Function {
-    let t = match tok.cur_tok().kind {
-        TokenKind::TYPE(t) => t,
-        _ => tok.error(
+    let _ = match tok.cur_tok().kind {
+        | TokenKind::TYPE(t) => t,
+        | _ => tok.error(
             tok.cur_tok().input_pos(),
             String::from("Expected Type!!"),
             tok.cur_tok().len(),
@@ -762,9 +762,9 @@ fn parse_function(tok: &mut TokenReader) -> Function {
         func_args.push(arg);
 
         match tok.cur_tok().char.as_str() {
-            "," => tok.next(),
-            ")" => (),
-            _ => panic!("invalid syntax"),
+            | "," => tok.next(),
+            | ")" => (),
+            | _ => panic!("invalid syntax"),
         }
     }
 
@@ -929,16 +929,16 @@ pub fn read_node(node: &Node, depth: &mut usize) {
 fn print_node_info(node: &Node, depth: &mut usize) {
     print!("{}", " ".repeat(*depth * 2));
     match node.kind {
-        NodeKind::ND_NUM => {
+        | NodeKind::ND_NUM => {
             println!("kind: {:?}, val: {}", node.kind, node.val);
         }
-        NodeKind::ND_IDENT => {
+        | NodeKind::ND_IDENT => {
             println!("kind: {:?}, str: {}", node.kind, node.str)
         }
-        NodeKind::ND_FNCALL => {
+        | NodeKind::ND_FNCALL => {
             println!("kind: {:?}, fn_name: {}", node.kind, node.fn_name)
         }
-        _ => {
+        | _ => {
             println!("kind: {:?}", node.kind);
         }
     }

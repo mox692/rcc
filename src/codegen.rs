@@ -1,12 +1,10 @@
-use crate::intermediate_process::blockstr_to_identid;
-use crate::intermediate_process::FunctionLocalVariable;
-use crate::intermediate_process::build_block_str;
-use crate::intermediate_process::FN_ARG_BLOC_STR;
-use crate::parse::Function;
-use crate::parse::Node;
-use crate::parse::NodeKind;
-use std::fs::File;
-use std::io::prelude::*;
+use crate::{
+    intermediate_process::{
+        blockstr_to_identid, FunctionLocalVariable, FN_ARG_BLOC_STR,
+    },
+    parse::{Function, Node, NodeKind},
+};
+use std::{fs::File, io::prelude::*};
 
 // forやifでjmpする先のLabelを管理するstruct.
 struct CodeLabel {
@@ -59,14 +57,15 @@ pub fn codegen_func(function: Function, f: &mut File) {
     for (i, arg) in function.fn_args.iter().cloned().enumerate() {
         let reg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
         let ident_id =
-        blockstr_to_identid(arg.sym.clone(), String::from(FN_ARG_BLOC_STR));
+            blockstr_to_identid(arg.sym.clone(), String::from(FN_ARG_BLOC_STR));
 
-        let offset = function.local_variable.get_val_offset_by_identid_recursively(ident_id)
-                                                   .unwrap_or_else(|| panic!("symbol: {} not found", arg.sym.clone()));
+        let offset = function
+            .local_variable
+            .get_val_offset_by_identid_recursively(ident_id)
+            .unwrap_or_else(|| panic!("symbol: {} not found", arg.sym.clone()));
 
         writeln!(f, "mov %{}, -{}(%rbp)", reg[i], offset);
     }
-
 
     // 各stmt毎にcodegen.
     // TODO: 将来的には(Nodeというより)Function毎にcodegenをしていくイメージ.
@@ -107,17 +106,15 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        if let Some(offset) = lv
-            .get_val_offset_by_identid_recursively(blockstr_to_identid(
-                node.str.clone(),
-                node.block_str.clone(),
-            )) {
-                writeln!(f, "lea -{}(%rbp), %rax", offset);
-                writeln!(f, "mov (%rax), %rax");
-                writeln!(f, "push %rax");
-                return;
-            }
-        
+        if let Some(offset) = lv.get_val_offset_by_identid_recursively(
+            blockstr_to_identid(node.str.clone(), node.block_str.clone()),
+        ) {
+            writeln!(f, "lea -{}(%rbp), %rax", offset);
+            writeln!(f, "mov (%rax), %rax");
+            writeln!(f, "push %rax");
+            return;
+        }
+
         // 関数の引数を一応調べる(必要ないかも)
         let ident_id =
             blockstr_to_identid(node.str.clone(), String::from(FN_ARG_BLOC_STR));
@@ -127,7 +124,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
             writeln!(f, "push %rax");
             return;
         } else {
-            panic!("sym :{} not found.",node.str.clone())
+            panic!("sym :{} not found.", node.str.clone())
         }
     }
     if node.kind == NodeKind::ND_FNCALL {
@@ -227,7 +224,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IF || node.kind == NodeKind::ND_ELSIF {
         cl.cur_index += 1;
-        let mut i = cl.cur_label_index();
+        let i = cl.cur_label_index();
         gen(node.l.as_ref().unwrap(), f, lv, cl);
         writeln!(f, "pop %rax");
         writeln!(f, "mov $1, %rdi");
@@ -250,8 +247,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
 
     if node.kind == NodeKind::ND_DECL {
         // TODO: declnにblockstrがひっついている構造
-        let ident_id =
-            blockstr_to_identid(node.l.as_ref().unwrap().str.clone(), node.block_str.clone());
+        let ident_id = blockstr_to_identid(
+            node.l.as_ref().unwrap().str.clone(),
+            node.block_str.clone(),
+        );
         let offset = lv
             .get_val_offset_by_identid(ident_id.clone())
             .unwrap_or_else(|| {
@@ -278,51 +277,51 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
 
     match node.kind {
         // 四則演算.
-        NodeKind::ND_ADD => {
+        | NodeKind::ND_ADD => {
             writeln!(f, "add %rdi, %rax");
         }
-        NodeKind::ND_SUB => {
+        | NodeKind::ND_SUB => {
             writeln!(f, "sub %rdi, %rax");
         }
-        NodeKind::ND_MUL => {
+        | NodeKind::ND_MUL => {
             writeln!(f, "imul %rdi, %rax");
         }
-        NodeKind::ND_DIV => {
+        | NodeKind::ND_DIV => {
             writeln!(f, "cqo");
             writeln!(f, "idiv %rdi");
         }
         // 比較演算.
-        NodeKind::ND_EQ => {
+        | NodeKind::ND_EQ => {
             writeln!(f, "cmp %rdi, %rax");
             writeln!(f, "sete %al");
             writeln!(f, "movzb %al, %rax");
         }
-        NodeKind::ND_NEQ => {
+        | NodeKind::ND_NEQ => {
             writeln!(f, "cmp %rdi, %rax");
             writeln!(f, "setne %al");
             writeln!(f, "movzb %al, %rax");
         }
-        NodeKind::ND_LE => {
+        | NodeKind::ND_LE => {
             writeln!(f, "cmp %rdi, %rax");
             writeln!(f, "setle %al");
             writeln!(f, "movzb %al, %rax");
         }
-        NodeKind::ND_LT => {
+        | NodeKind::ND_LT => {
             writeln!(f, "cmp %rdi, %rax");
             writeln!(f, "setl %al");
             writeln!(f, "movzb %al, %rax");
         }
-        NodeKind::ND_BE => {
+        | NodeKind::ND_BE => {
             writeln!(f, "cmp %rax, %rdi");
             writeln!(f, "setle %al");
             writeln!(f, "movzb %al, %rax");
         }
-        NodeKind::ND_BT => {
+        | NodeKind::ND_BT => {
             writeln!(f, "cmp %rax, %rdi");
             writeln!(f, "setl %al");
             writeln!(f, "movzb %al, %rax");
         }
-        _ => {}
+        | _ => {}
     }
 
     writeln!(f, "push %rax");
@@ -330,8 +329,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
 
 fn create_file(path: &str) -> File {
     let f = match File::create(path) {
-        Ok(f) => f,
-        Err(e) => panic!(e),
+        | Ok(f) => f,
+        | Err(e) => panic!(e),
     };
     return f;
 }

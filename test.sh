@@ -4,7 +4,7 @@ test() {
     input=$1
     expect=$2
 
-    ./target/debug/rcc "$input" "false"
+    ./target/debug/rcc --std "$input"
     gcc -o gen gen.s
 
     ./gen
@@ -242,6 +242,6 @@ int fib(int n) {
     return fib(n - 1) + fib(n - 2);
 }
 int main() {
-    return fib(4);
+    return fib(6);
 }
-" 3
+" 8

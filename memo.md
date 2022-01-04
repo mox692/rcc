@@ -135,7 +135,8 @@ int main() {
   * local変数の時と同様に、fucntion table的なものを作成した方がいいかも
 
 * print関数を提供する
-      
+* commentのサポート
+
 * Error msgを豊富にする.
 * local valのdebug機構
   * inputをglobalで持ちたい.

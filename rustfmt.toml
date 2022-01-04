@@ -1,0 +1,4 @@
+indent_style = "Block"
+merge_imports = true
+match_arm_leading_pipes = "Always"
+max_width = 90

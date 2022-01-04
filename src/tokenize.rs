@@ -1,5 +1,4 @@
-use crate::errors::display_around_pos;
-use crate::errors::init_error;
+use crate::errors::{display_around_pos, init_error};
 
 #[derive(Clone)]
 pub struct Token {
@@ -152,8 +151,8 @@ pub enum Type {
 impl Type {
     pub fn size(&self) -> usize {
         match &self {
-            Type::INT => 8,
-            _ => panic!("unknown size")
+            | Type::INT => 8,
+            | _ => panic!("unknown size"),
         }
     }
 }
@@ -220,7 +219,8 @@ pub fn tokenize(string: String) -> Vec<Token> {
     loop {
         let char = l.cur_char();
         if char.eq(&'\0') {
-            let tok = Token::new_token(TokenKind::EOF, 0, String::from("\0"), l.cur_pos());
+            let tok =
+                Token::new_token(TokenKind::EOF, 0, String::from("\0"), l.cur_pos());
             l.push_tok(tok);
             break;
         }
@@ -248,7 +248,8 @@ pub fn tokenize(string: String) -> Vec<Token> {
                 cur_num = cur_num * 10 + char.to_digit(10).unwrap() as i32;
                 l.next_char();
             }
-            let tok = Token::new_token(TokenKind::NUM, cur_num, String::from(""), l.cur_pos());
+            let tok =
+                Token::new_token(TokenKind::NUM, cur_num, String::from(""), l.cur_pos());
             l.push_tok(tok);
             continue;
         }
@@ -262,11 +263,11 @@ pub fn tokenize(string: String) -> Vec<Token> {
             // TODO: use hashmap
             let tok_kind: TokenKind;
             match cur_str.as_str() {
-                "for" => tok_kind = TokenKind::FOR,
-                "return" => tok_kind = TokenKind::RETURN,
-                "if" => tok_kind = TokenKind::IF,
-                "int" => tok_kind = TokenKind::TYPE(Type::INT),
-                "else" => {
+                | "for" => tok_kind = TokenKind::FOR,
+                | "return" => tok_kind = TokenKind::RETURN,
+                | "if" => tok_kind = TokenKind::IF,
+                | "int" => tok_kind = TokenKind::TYPE(Type::INT),
+                | "else" => {
                     // read whitespace.
                     l.next();
                     if l.expect_and_read("if") {
@@ -276,7 +277,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
                         tok_kind = TokenKind::ELSE
                     }
                 }
-                _ => tok_kind = TokenKind::IDENT,
+                | _ => tok_kind = TokenKind::IDENT,
             }
             let tok = Token::new_token(tok_kind, 0, cur_str, l.cur_pos());
             l.push_tok(tok);
@@ -392,13 +393,13 @@ pub fn debug_tokens(flag: bool, tokens: &Vec<Token>) {
 
 fn print_token_info(tok: &Token) {
     match tok.kind {
-        TokenKind::NUM => {
+        | TokenKind::NUM => {
             println!("kind: {:?}, val: {}, pos: {}", tok.kind, tok.value, tok.pos)
         }
-        TokenKind::PUNCT | TokenKind::IDENT => {
+        | TokenKind::PUNCT | TokenKind::IDENT => {
             println!("kind: {:?}, char: {}, pos: {}", tok.kind, tok.char, tok.pos)
         }
-        _ => {
+        | _ => {
             println!("kind: {:?}, pos: {}", tok.kind, tok.pos)
         }
     }

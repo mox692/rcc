@@ -6,41 +6,65 @@ mod errors;
 mod intermediate_process;
 mod parse;
 mod tokenize;
-
 use codegen::codegen;
 use intermediate_process::intermediate_process;
-use parse::debug_functions;
-use parse::parse;
-use std::env;
-use tokenize::debug_tokens;
-use tokenize::tokenize;
-use tokenize::NewTokenReader;
-use tokenize::Token;
-// use once_cell::sync::Lazy;
-// use std::sync::Mutex;
+use parse::{debug_functions, parse};
+use tokenize::{debug_tokens, tokenize, NewTokenReader, Token};
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut input: String = args[1].clone();
+use clap::{App, Arg};
+use std::{fs, io};
 
-    let arg_len = args.len();
+fn main() -> Result<(), io::Error> {
+    let matches = App::new("rcc")
+        .author("Motoyuki Kimura")
+        .about("A small C compiler")
+        .arg(Arg::new("SOURCE").help("input source."))
+        .arg(
+            Arg::new("std")
+                .long("std")
+                .short('s')
+                .help("get input by stdin."),
+        )
+        .arg(
+            Arg::new("debug")
+                .long("debug")
+                .short('d')
+                .help("print debug info to stdout."),
+        )
+        .get_matches();
+
+    let mut source_input: String;
     let mut debug_flag = false;
 
-    // (tokenizeがしやすくなるため)終端文字を加える.
-    input.push('\0');
-    if arg_len == 3 {
-        debug_flag = if args[2].eq("true") { true } else { false };
+    // sourceを取得
+    if matches.is_present("std") {
+        source_input = matches
+            .value_of("SOURCE")
+            .unwrap_or_else(|| panic!("Source is not specified."))
+            .to_string();
+    } else {
+        let path = matches
+            .value_of("SOURCE")
+            .unwrap_or_else(|| panic!("Source is not specified."))
+            .to_string();
+        source_input = fs::read_to_string(path)?;
+    }
+    // debug flagの確認
+    if let Some(_) = matches.value_of("debug") {
+        debug_flag = true
     }
 
-    let token: Vec<Token> = tokenize(input);
-    // debug token.
+    // 末尾に終端文字を入れておく
+    source_input.push('\0');
+
+    let token: Vec<Token> = tokenize(source_input);
+
     debug_tokens(debug_flag, &token);
 
     let mut token_reader = NewTokenReader(token);
 
     let mut functions = parse(&mut token_reader);
 
-    // debug node.
     debug_functions(debug_flag, &functions);
 
     functions = intermediate_process(functions);
@@ -48,5 +72,5 @@ fn main() {
     // generate assembly
     codegen(functions);
 
-    return;
+    return Ok(());
 }

@@ -245,3 +245,18 @@ int main() {
     return fib(6);
 }
 " 8
+test "
+int main() {
+    // comment here
+    // \n comment here
+    return 2;
+}
+" 2
+
+test "
+/*a aa*/
+int main() {
+    /* comment here ... \n */
+    return 22;
+}
+" 22

@@ -83,6 +83,16 @@ impl Lexer {
     fn push_tok(&mut self, tok: Token) {
         let _ = &self.token_vec.push(tok);
     }
+    // expect compares the character currently pointed to by Lexer
+    // with the string passed as an argument and returns true if they match.
+    fn expect(&self, str: &str) -> bool {
+        for (i, c) in str.chars().enumerate() {
+            if self.get_nth_next(i) == c {
+                return false;
+            }
+        }
+        return true;
+    }
     // similar to expect, but it advance l.cur as side effect if it return true.
     fn expect_and_read(&mut self, str: &str) -> bool {
         for (i, c) in str.chars().enumerate() {
@@ -208,6 +218,8 @@ pub fn tokenize(string: String) -> Vec<Token> {
 
     loop {
         let char = l.cur_char();
+
+        // EOF
         if char.eq(&'\0') {
             let tok =
                 Token::new_token(TokenKind::EOF, 0, String::from("\0"), l.cur_pos());
@@ -215,12 +227,30 @@ pub fn tokenize(string: String) -> Vec<Token> {
             break;
         }
 
+        // comment starting with `//`
+        if l.expect_and_read("//") {
+            while !l.expect_and_read("\n") {
+                l.next();
+            }           
+            continue;
+        }
+
+        // comment starting with `/*`
+        if l.expect_and_read("/*") {
+            while !l.expect_and_read("*/") {
+                l.next_char();
+            }
+            continue;
+        }
+
+        // punct
         if char.is_ascii_punctuation() {
             let tok = read_punct(&mut l);
             l.push_tok(tok);
             continue;
         }
 
+        // number
         if char.is_ascii_digit() {
             let mut cur_num: i32 = char.to_digit(10).unwrap() as i32;
             l.next_char();
@@ -269,6 +299,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
                 }
                 | _ => tok_kind = TokenKind::IDENT,
             }
+
             let tok = Token::new_token(tok_kind, 0, cur_str, l.cur_pos());
             l.push_tok(tok);
             continue;

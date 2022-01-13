@@ -136,6 +136,7 @@ int main() {
 
 * print関数を提供する
 * commentのサポート
+* CIでformatさせる
 
 * Error msgを豊富にする.
 * local valのdebug機構

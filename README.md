@@ -18,3 +18,8 @@ $ ./gen
 
 $ echo $?                                   // check the exit-code
 ```
+
+### format
+```
+$ cargo fmt
+```

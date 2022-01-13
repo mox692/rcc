@@ -81,17 +81,7 @@ impl Lexer {
         return self.input.chars().nth(self.pos + n).unwrap();
     }
     fn push_tok(&mut self, tok: Token) {
-        &self.token_vec.push(tok);
-    }
-    // expect compares the character currently pointed to by Lexer
-    // with the string passed as an argument and returns true if they match.
-    fn expect(&mut self, str: &str) -> bool {
-        for (i, c) in str.chars().enumerate() {
-            if self.get_nth_next(i).eq(&c) {
-                return false;
-            }
-        }
-        return true;
+        let _ = &self.token_vec.push(tok);
     }
     // similar to expect, but it advance l.cur as side effect if it return true.
     fn expect_and_read(&mut self, str: &str) -> bool {
@@ -372,7 +362,7 @@ impl TokenReader {
     }
 }
 
-pub fn NewTokenReader(token: Vec<Token>) -> TokenReader {
+pub fn new_token_reader(token: Vec<Token>) -> TokenReader {
     return TokenReader {
         tokens: token,
         cur: 0,

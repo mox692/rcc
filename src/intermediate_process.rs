@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    parse::{Function, Node, NodeKind},
-};
+use crate::parse::{Function, Node, NodeKind};
 
 // IdentID is a unique label for Functino's local variable,
 // and generated from blockstr. This label holds variable's
@@ -95,7 +93,7 @@ fn upper_block_ident_id(ident_id: &String) -> Option<String> {
     let mut v: Vec<&str> = ident_id.split("_").collect();
     match v.pop() {
         | None => return None,
-        | Some(_) => ()
+        | Some(_) => (),
     };
     return Some(v.join("_"));
 }

@@ -9,7 +9,7 @@ mod tokenize;
 use codegen::codegen;
 use intermediate_process::intermediate_process;
 use parse::{debug_functions, parse};
-use tokenize::{debug_tokens, tokenize, NewTokenReader, Token};
+use tokenize::{debug_tokens, new_token_reader, tokenize, Token};
 
 use clap::{App, Arg};
 use std::{fs, io};
@@ -61,7 +61,7 @@ fn main() -> Result<(), io::Error> {
 
     debug_tokens(debug_flag, &token);
 
-    let mut token_reader = NewTokenReader(token);
+    let mut token_reader = new_token_reader(token);
 
     let mut functions = parse(&mut token_reader);
 

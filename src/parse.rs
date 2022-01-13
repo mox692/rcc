@@ -37,6 +37,7 @@ impl Function {
 }
 
 // TODO: 他の型もsupportするようになったら、ここをもっと複雑にする
+#[allow(dead_code)]
 type Value = i32;
 
 #[derive(Clone, Debug)]
@@ -139,6 +140,8 @@ impl Default for Node {
         };
     }
 }
+
+#[allow(non_camel_case_types)]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum NodeKind {
     ND_ROOT,
@@ -169,7 +172,7 @@ pub enum NodeKind {
     ND_BLOCK,
     ND_DECL,
 }
-fn gen_expr(expr_node: Option<Box<Node>>, tok: &mut TokenReader) -> Option<Box<Node>> {
+fn gen_expr(expr_node: Option<Box<Node>>, _: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_EXPR,
         l: expr_node,

@@ -1,7 +1,5 @@
 use crate::{
-    intermediate_process::{
-        blockstr_to_identid, FunctionLocalVariable, FN_ARG_BLOC_STR,
-    },
+    intermediate_process::{blockstr_to_identid, FunctionLocalVariable, FN_ARG_BLOC_STR},
     parse::{Function, Node, NodeKind},
 };
 use std::{fs::File, io::prelude::*};
@@ -19,6 +17,7 @@ impl CodeLabel {
     }
 }
 
+#[allow(unused_must_use)]
 pub fn codegen(functions: Vec<Function>) {
     let mut output_file = create_file("./gen.s");
     writeln!(output_file, ".text");
@@ -27,6 +26,7 @@ pub fn codegen(functions: Vec<Function>) {
     }
 }
 
+#[allow(unused_must_use)]
 pub fn codegen_func(function: Function, f: &mut File) {
     let root_node = &function.root_node;
 
@@ -80,6 +80,7 @@ pub fn codegen_func(function: Function, f: &mut File) {
 }
 
 // 引数で渡されたNodeを展開して、その評価結果をstack topにpushする.
+#[allow(unused_must_use)]
 fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeLabel) {
     /*
         gen from unary node.
@@ -330,7 +331,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
 fn create_file(path: &str) -> File {
     let f = match File::create(path) {
         | Ok(f) => f,
-        | Err(e) => panic!(e),
+        | Err(e) => panic!("{}", e),
     };
     return f;
 }

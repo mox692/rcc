@@ -128,6 +128,18 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
             panic!("sym :{} not found.", node.str.clone())
         }
     }
+    if node.kind == NodeKind::ND_PTR_REF {
+        let src_node = node.ptr_ref_ident.clone().unwrap().as_ref().clone();
+        let ident_id = blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
+
+        if let Some(offset) = lv.get_val_offset_by_identid_recursively(ident_id) {
+            writeln!(f, "leaq -{}(%rbp), %rax", offset);
+            writeln!(f, "push %rax");
+            return;
+        } else {
+            panic!("sym :{} not found.", node.str.clone())
+        }
+    }
     if node.kind == NodeKind::ND_FNCALL {
         let reg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
         // 引数をregisterにおく

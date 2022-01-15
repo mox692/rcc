@@ -257,6 +257,10 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     if node.kind == NodeKind::ND_NUM {
         return;
     }
+    if node.kind == NodeKind::ND_PTR_REF {
+        read_node(&mut node.ptr_ref_ident.as_mut().unwrap(), arg);
+        return;       
+    }
 
     /*
        nodes that have next node in left side.

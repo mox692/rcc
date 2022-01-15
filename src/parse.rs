@@ -101,6 +101,9 @@ pub struct Node {
     // 変数宣言nodeの
     pub decl_type: Type,
 
+    // &によるpointer 参照用
+    pub ptr_ref_ident: Option<Box<Node>>,
+
     // function
     pub fn_type: Type,
     pub fn_ident: String,
@@ -133,6 +136,7 @@ impl Default for Node {
             block_str: String::new(),
             ident_id: String::new(),
             decl_type: Type::None,
+            ptr_ref_ident: None, 
             fn_type: Type::None,
             fn_ident: String::new(),
             fn_callee_args: Vec::new(),
@@ -171,6 +175,7 @@ pub enum NodeKind {
     ND_FNCALL,
     ND_BLOCK,
     ND_DECL,
+    ND_PTR_REF,
 }
 fn gen_expr(expr_node: Option<Box<Node>>, _: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
@@ -294,10 +299,21 @@ fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
     return gen_fn_call_node(fn_name, args);
 }
 
-// unary = &num | &ident | &ident "(" ")"
+fn gen_ref_node(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let ident_node = gen_ident_node(tok);
+    return  Some(Box::new(Node {
+        kind: NodeKind::ND_PTR_REF,
+        ptr_ref_ident: ident_node,
+        ..Default::default()
+    }))
+}
+
+// unary = &num | &ident | fn_call | ref
 fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().kind == TokenKind::NUM {
         return gen_num_node(tok);
+    } else if tok.cur_tok().char == "&" {
+        return gen_ref_node(tok.next_tok());
     } else if tok.cur_tok().kind == TokenKind::IDENT {
         if tok.get_next_tok().char == "(" {
             // 呼び出し先で、`(`の次を読める様に.

@@ -197,8 +197,10 @@ fn read_punct(l: &mut Lexer) -> Token {
         return Token::new_token(TokenKind::PUNCT, 0, String::from("}"), l.cur_pos());
     } else if l.expect_and_read(",") {
         return Token::new_token(TokenKind::PUNCT, 0, String::from(","), l.cur_pos());
+    } else if l.expect_and_read("&") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("&"), l.cur_pos());
     }
-    panic!("");
+    panic!("Unexpected token, {}", l.cur_char());
 }
 
 pub fn tokenize(string: String) -> Vec<Token> {

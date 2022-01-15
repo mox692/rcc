@@ -11,3 +11,4 @@ int fib(int n) {
 int main() {
     return fib(6);
 }
+// -> will be 22

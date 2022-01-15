@@ -232,7 +232,8 @@ assign = &ident "=" equality
 expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
-unary = &num | &ident | fn_call
+unary = &num | &ident | fn_call | ref
+ref = "&" &ident
 fn_call = &ident "(" (equality ,)* ")"
 ```
 
@@ -243,6 +244,7 @@ fn_call = &ident "(" (equality ,)* ")"
   * 1216: function callに対応の予定
   * 12/18: forのバグ修正による変更(3つめのblockを assign | expr にした)
   * 12/18: 関数引数supportによる変更
+  * 1/11: pointer型を作成
 
   
 ### 設計の後悔

@@ -66,6 +66,7 @@ impl FnArgs {
 #[derive(Clone, Debug)]
 pub struct Node {
     pub kind: NodeKind,
+    pub typ: Type,
     pub l: Option<Box<Node>>,
     pub r: Option<Box<Node>>,
     // for num node. (should be 0 in other node.)
@@ -98,11 +99,13 @@ pub struct Node {
     // IdentID
     pub ident_id: String,
 
-    // 変数宣言nodeの
+    // 変数宣言nodeのtype
     pub decl_type: Type,
 
     // &によるpointer 参照用
     pub ptr_ref_ident: Option<Box<Node>>,
+    // *によるpointer 参照用
+    pub ptr_deref_ident: Option<Box<Node>>,
 
     // function
     pub fn_type: Type,
@@ -116,6 +119,7 @@ impl Default for Node {
         return Node {
             // `kind` must be override.
             kind: NodeKind::ND_NUM,
+            typ: Type::None,
             l: None,
             r: None,
             val: 0,
@@ -137,6 +141,7 @@ impl Default for Node {
             ident_id: String::new(),
             decl_type: Type::None,
             ptr_ref_ident: None, 
+            ptr_deref_ident: None,
             fn_type: Type::None,
             fn_ident: String::new(),
             fn_callee_args: Vec::new(),
@@ -176,6 +181,7 @@ pub enum NodeKind {
     ND_BLOCK,
     ND_DECL,
     ND_PTR_REF,
+    ND_PTR_DEREF,
 }
 fn gen_expr(expr_node: Option<Box<Node>>, _: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
@@ -217,9 +223,23 @@ fn gen_stmt(tok: &mut TokenReader, node: Option<Box<Node>>) -> Option<Box<Node>>
     return node;
 }
 
-fn gen_ident_node(tok: &mut TokenReader) -> Option<Box<Node>> {
+// TODO: Typeの埋め込みを呼び出し先でやるか、ここでやるか
+fn gen_ident_node_with_unknown_typ(tok: &mut TokenReader) -> Option<Box<Node>> {
     let node = Some(Box::new(Node {
         kind: NodeKind::ND_IDENT,
+        typ: Type::Unknown,
+        str: String::from(tok.cur_tok().char),
+        ..Default::default()
+    }));
+    // MEMO: curを";"にして戻る.
+    tok.next();
+    return node;
+}
+
+fn gen_ident_node_with_type(tok: &mut TokenReader, typ: Type) -> Option<Box<Node>> {
+    let node = Some(Box::new(Node {
+        kind: NodeKind::ND_IDENT,
+        typ: typ,
         str: String::from(tok.cur_tok().char),
         ..Default::default()
     }));
@@ -290,6 +310,9 @@ fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
             continue;
         }
         // TODO: argsのType Check
+        // return foo(&a);
+        // let arg_node = parse_equality(tok).unwrap().as_ref().clone();
+
         let arg = FnArgs::new_for_caller(Type::INT, parse_equality(tok));
         args.push(arg);
     }
@@ -299,8 +322,17 @@ fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
     return gen_fn_call_node(fn_name, args);
 }
 
+fn gen_deref_node(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let ident_node = gen_ident_node_with_unknown_typ(tok);
+    return  Some(Box::new(Node {
+        kind: NodeKind::ND_PTR_DEREF,
+        ptr_deref_ident: ident_node,
+        ..Default::default()
+    }))
+}
+
 fn gen_ref_node(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let ident_node = gen_ident_node(tok);
+    let ident_node = gen_ident_node_with_unknown_typ(tok);
     return  Some(Box::new(Node {
         kind: NodeKind::ND_PTR_REF,
         ptr_ref_ident: ident_node,
@@ -308,19 +340,21 @@ fn gen_ref_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     }))
 }
 
-// unary = &num | &ident | fn_call | ref
+// unary = &num | &ident | fn_call | ref | deref
 fn parse_unary(tok: &mut TokenReader) -> Option<Box<Node>> {
     if tok.cur_tok().kind == TokenKind::NUM {
         return gen_num_node(tok);
     } else if tok.cur_tok().char == "&" {
         return gen_ref_node(tok.next_tok());
+    } else if tok.cur_tok().char == "*" {
+        return gen_deref_node(tok.next_tok());
     } else if tok.cur_tok().kind == TokenKind::IDENT {
         if tok.get_next_tok().char == "(" {
             // 呼び出し先で、`(`の次を読める様に.
             let fn_name = tok.cur_tok().char;
             return parse_fn_call(tok.next_nth_tok(2), fn_name);
         } else {
-            return gen_ident_node(tok);
+            return gen_ident_node_with_unknown_typ(tok);
         }
     } else {
         tok.error(
@@ -393,7 +427,7 @@ fn parse_expr(tok: &mut TokenReader) -> Option<Box<Node>> {
 
 // assign = &ident ( "=" equality )*
 fn parse_assign(tok: &mut TokenReader) -> Option<Box<Node>> {
-    let mut node = gen_ident_node(tok);
+    let mut node = gen_ident_node_with_unknown_typ(tok);
     if tok.expect("=") {
         node = Some(Box::new(gen_binary_node(
             NodeKind::ND_ASSIGN,
@@ -535,14 +569,7 @@ fn parse_forstmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         ..Default::default()
     });
     if tok.cur_tok().char == "(" {
-        // for(int a = 3;)
-
-        let t = match tok.get_next_tok().kind {
-            | TokenKind::TYPE(t) => t,
-            | _ => panic!("fds"),
-        };
-
-        node.for_node_first_assign = parse_declare(tok.next_tok(), t);
+        node.for_node_first_assign = parse_declare(tok.next_tok());
     } else {
         tok.error(
             tok.cur_input_pos(),
@@ -625,12 +652,18 @@ fn parse_equality(tok: &mut TokenReader) -> Option<Box<Node>> {
     return node;
 }
 
-// declare = &type &ident "=" equality
+// declare = type ( * )? &ident "=" equality
 // MEMO: typeより後ろはassign式と同じだが、コードジェネレータの都合で、
 // declareの中にassignを入れるようなことはしない.
-fn parse_declare(tok: &mut TokenReader, t: Type) -> Option<Box<Node>> {
+fn parse_declare(tok: &mut TokenReader) -> Option<Box<Node>> {
+    let t = tok.try_get_type().unwrap_or_else(|e| panic!("Err: {}", e));
+    if t.is_ptr() {
+        // pointerだったら tokenを(*)の分1つ進めておく
+        tok.next();
+    }
+
     // cur -> &type
-    let ident_node = gen_ident_node(tok.next_tok());
+    let ident_node = gen_ident_node_with_type(tok.next_tok(), t.clone());
     if !tok.expect("=") {
         panic!("");
     }
@@ -652,8 +685,8 @@ fn parse_stmt(tok: &mut TokenReader) -> Option<Box<Node>> {
         | TokenKind::RETURN => {
             node = parse_return(tok);
         }
-        | TokenKind::TYPE(t) => {
-            node = parse_declare(tok, t);
+        | TokenKind::TYPE(_) => {
+            node = parse_declare(tok);
         }
         // equality or assign
         | TokenKind::IDENT => {
@@ -736,7 +769,7 @@ fn parse_stmts(tok: &mut TokenReader) -> Option<Box<Node>> {
 
 // function = int ident "(" ( &type &ident "," )* ")" block
 fn parse_function(tok: &mut TokenReader) -> Function {
-    let _ = match tok.cur_tok().kind {
+    let t = match tok.cur_tok().kind {
         | TokenKind::TYPE(t) => t,
         | _ => tok.error(
             tok.cur_tok().input_pos(),
@@ -745,7 +778,7 @@ fn parse_function(tok: &mut TokenReader) -> Function {
         ),
     };
 
-    let fn_ident_node = gen_ident_node(tok.next_tok());
+    let fn_ident_node = gen_ident_node_with_type(tok.next_tok(), t);
     let fn_name = fn_ident_node.unwrap().as_ref().str.clone();
 
     if tok.cur_tok().char != "(" {
@@ -763,10 +796,9 @@ fn parse_function(tok: &mut TokenReader) -> Function {
         let typ;
         let sym;
 
-        if let TokenKind::TYPE(t) = tok.cur_tok().kind {
-            typ = t;
-        } else {
-            panic!("aaaaaaaa")
+        typ = tok.try_get_type().unwrap_or_else(|e | panic!("Err: {}", e));
+        if typ.is_ptr() {
+            tok.next();
         }
         tok.next();
         if let TokenKind::IDENT = tok.cur_tok().kind {

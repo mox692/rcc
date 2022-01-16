@@ -146,13 +146,22 @@ pub enum TokenKind {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     None,
+    Unknown,
     INT,
+    PTR(Box<Type>)
 }
 impl Type {
     pub fn size(&self) -> usize {
         match &self {
             | Type::INT => 8,
+            | Type::PTR(_) => 8,
             | _ => panic!("unknown size"),
+        }
+    }
+    pub fn is_ptr(&self) -> bool {
+        match &self {
+            Type::PTR(_) => true,
+            _ => false
         }
     }
 }
@@ -199,6 +208,8 @@ fn read_punct(l: &mut Lexer) -> Token {
         return Token::new_token(TokenKind::PUNCT, 0, String::from(","), l.cur_pos());
     } else if l.expect_and_read("&") {
         return Token::new_token(TokenKind::PUNCT, 0, String::from("&"), l.cur_pos());
+    } else if l.expect_and_read("*") {
+        return Token::new_token(TokenKind::PUNCT, 0, String::from("*"), l.cur_pos());
     }
     panic!("Unexpected token, {}", l.cur_char());
 }
@@ -369,6 +380,22 @@ impl TokenReader {
             false
         }
     }
+    // cur_tokがtypeを指している時に、そのtypeを返す.
+    // pointerにも対応している.
+    pub fn try_get_type(&mut self) -> Result<Type, String> {
+        // どういうtypeか
+        let t = match self.cur_tok().kind {
+            TokenKind::TYPE(t)  => t,
+            _ => return Err(format!("Expect Type, but got kind: {:?}", self.cur_tok().kind))
+        };
+
+        // pointerかpointer以外か
+        match self.get_next_tok().char.as_str() {
+            "*" => Ok(Type::PTR(Box::new(t))),
+            _ => Ok(t),
+        }
+    }
+
     pub fn error(&self, input_pos: usize, message: String, tok_len: usize) -> ! {
         // TODO: refactor
         let str = display_around_pos(input_pos);

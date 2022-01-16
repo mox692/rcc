@@ -260,3 +260,39 @@ int main() {
     return 22;
 }
 " 22
+
+test "
+int main() {
+    int a = 4;
+    return &a;
+}
+" 33
+
+test "
+int main() {
+    int a = 3;
+    int *b = &a;
+    return *b;
+}
+" 3
+test "
+int main() {
+    int a = 33;
+    int *b = &a;
+    int c = *b;
+    return c;
+}
+" 33
+test "
+int foo(int *ptr) {
+    int c = 3;
+    int *d = &c; 
+    int aa = *d + *ptr;
+    return aa;
+}
+int main() {
+    int a = 33;
+    int b = foo(&a);
+    return b;
+}
+" 36

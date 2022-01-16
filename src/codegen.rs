@@ -59,12 +59,12 @@ pub fn codegen_func(function: Function, f: &mut File) {
         let ident_id =
             blockstr_to_identid(arg.sym.clone(), String::from(FN_ARG_BLOC_STR));
 
-        let offset = function
+        let val = function
             .local_variable
             .get_val_offset_by_identid_recursively(ident_id)
             .unwrap_or_else(|| panic!("symbol: {} not found", arg.sym.clone()));
 
-        writeln!(f, "mov %{}, -{}(%rbp)", reg[i], offset);
+        writeln!(f, "mov %{}, -{}(%rbp)", reg[i], val.offset);
     }
 
     // 各stmt毎にcodegen.
@@ -107,10 +107,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        if let Some(offset) = lv.get_val_offset_by_identid_recursively(
+        if let Some(val) = lv.get_val_offset_by_identid_recursively(
             blockstr_to_identid(node.str.clone(), node.block_str.clone()),
         ) {
-            writeln!(f, "lea -{}(%rbp), %rax", offset);
+            writeln!(f, "lea -{}(%rbp), %rax", val.offset);
             writeln!(f, "mov (%rax), %rax");
             writeln!(f, "push %rax");
             return;
@@ -119,8 +119,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         // 関数の引数を一応調べる(必要ないかも)
         let ident_id =
             blockstr_to_identid(node.str.clone(), String::from(FN_ARG_BLOC_STR));
-        if let Some(offset) = lv.get_val_offset_by_identid_recursively(ident_id) {
-            writeln!(f, "lea -{}(%rbp), %rax", offset);
+        if let Some(val) = lv.get_val_offset_by_identid_recursively(ident_id) {
+            writeln!(f, "lea -{}(%rbp), %rax", val.offset);
             writeln!(f, "mov (%rax), %rax");
             writeln!(f, "push %rax");
             return;
@@ -132,8 +132,21 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         let src_node = node.ptr_ref_ident.clone().unwrap().as_ref().clone();
         let ident_id = blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
 
-        if let Some(offset) = lv.get_val_offset_by_identid_recursively(ident_id) {
-            writeln!(f, "leaq -{}(%rbp), %rax", offset);
+        if let Some(val) = lv.get_val_offset_by_identid_recursively(ident_id) {
+            writeln!(f, "leaq -{}(%rbp), %rax", val.offset);
+            writeln!(f, "push %rax");
+            return;
+        } else {
+            panic!("sym :{} not found.", src_node.str.clone())
+        }
+    }
+    if node.kind == NodeKind::ND_PTR_DEREF {
+        let src_node = node.ptr_deref_ident.clone().unwrap().as_ref().clone();
+        let ident_id = blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
+
+        if let Some(val) = lv.get_val_offset_by_identid_recursively(ident_id) {
+            writeln!(f, "mov -{}(%rbp), %rax", val.offset);
+            writeln!(f, "mov (%rax), %rax");
             writeln!(f, "push %rax");
             return;
         } else {
@@ -162,7 +175,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     //       変な終了コードになりそう.(まあ、さしあたりはそんなことは気にしない.)
     if node.kind == NodeKind::ND_ASSIGN {
         // 右辺のoffsetをs取得
-        let offset = lv
+        let val = lv
             .get_val_offset_by_identid_recursively(blockstr_to_identid(
                 node.l.as_ref().unwrap().str.clone(),
                 node.l.as_ref().unwrap().block_str.clone(),
@@ -171,7 +184,7 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
         // 左辺のstrと紐付けた形でstack上にデータ領域を確保.
         // -> ND_EXPRのcodeを生成.
         // TODO: getoffsetで、identIDを入れたらoffsetが出て9両に
-        writeln!(f, "lea -{}(%rbp), %rax", offset);
+        writeln!(f, "lea -{}(%rbp), %rax", val.offset);
         writeln!(f, "push %rax");
 
         gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);
@@ -264,14 +277,15 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
             node.l.as_ref().unwrap().str.clone(),
             node.block_str.clone(),
         );
-        let offset = lv
+        let val = lv
             .get_val_offset_by_identid(ident_id.clone())
             .unwrap_or_else(|| {
                 println!("ident_id: {}", ident_id.clone());
                 panic!("Not Found!!")
-            });
+            })
+            .clone();
 
-        writeln!(f, "lea -{}(%rbp), %rax", offset);
+        writeln!(f, "lea -{}(%rbp), %rax", val.offset);
         writeln!(f, "push %rax");
 
         gen(node.r.as_ref().unwrap().as_ref(), f, lv, cl);

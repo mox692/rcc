@@ -126,6 +126,28 @@ int main() {
   * 宣言とcallにおいて、引数をparseできるように
   * 
 
+1/16
+* pointerのtestを通したい！！
+```
+test "
+int foo(int *ptr) {
+    int aa = 3 + *ptr;
+    return aa;
+}
+int main() {
+    int a = 33;
+    int b = foo(&a);
+    return b;
+}
+" 36
+```
+* よくわからんけど、とりあえずtestが通らなくなってしまっている.
+  * ざっくり要約すると、関数の引数に識別子(ident)がある際に、その識別子に対してblock_strを付与してやることができなくなっていた
+    * valtableに保存したり取り出したりするのに、block_strが必須.
+  * 原因としては関数の引数のnode (fn_arg)が、ident_nodeを取らない構成になっている(ArgsのVecで構成されている)ので、ident_nodeを絡めた構成にする
+  * そうすると、intermedeateでblock_strを使用してpointer型を引数に渡すことができるようになるかも.
+
+
 ### TODO
 * 複数のfunctionをparseできるように
   * `int hoge() {}`という構文を新しく追加する必要がある.
@@ -224,7 +246,7 @@ elsif_node = "else if" "(" if_cond ")" stmts2
 else_node = "else" stmts2
 if_cond = equalit
 stmt = ( declare | assign | return | equality ) ";"
-declare = &type &ident "=" equality
+declare = type ( * )? &ident "=" equality
 type = "int"
 return = "return" equality
 equality = expr ( "==" expr | "!=" expr | "<=" expr | ">=" expr | ">" expr | "<" expr )?
@@ -232,7 +254,9 @@ assign = &ident "=" equality
 expr = add_sub
 add_sub = mul_div( "+" mul_div | "-" mul_div )*
 mul_div = unary ( "*" unary | "/" unary )*
-unary = &num | &ident | fn_call
+unary = &num | &ident | fn_call | ref | deref
+ref = "&" &ident
+deref = "*" &ident
 fn_call = &ident "(" (equality ,)* ")"
 ```
 
@@ -243,6 +267,8 @@ fn_call = &ident "(" (equality ,)* ")"
   * 1216: function callに対応の予定
   * 12/18: forのバグ修正による変更(3つめのblockを assign | expr にした)
   * 12/18: 関数引数supportによる変更
+  * 1/11: pointer型を作成
+  * 1/15: pointer型を作成2
 
   
 ### 設計の後悔

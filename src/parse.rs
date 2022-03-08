@@ -140,7 +140,7 @@ impl Default for Node {
             block_str: String::new(),
             ident_id: String::new(),
             decl_type: Type::None,
-            ptr_ref_ident: None, 
+            ptr_ref_ident: None,
             ptr_deref_ident: None,
             fn_type: Type::None,
             fn_ident: String::new(),
@@ -324,20 +324,20 @@ fn parse_fn_call(tok: &mut TokenReader, fn_name: String) -> Option<Box<Node>> {
 
 fn gen_deref_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     let ident_node = gen_ident_node_with_unknown_typ(tok);
-    return  Some(Box::new(Node {
+    return Some(Box::new(Node {
         kind: NodeKind::ND_PTR_DEREF,
         ptr_deref_ident: ident_node,
         ..Default::default()
-    }))
+    }));
 }
 
 fn gen_ref_node(tok: &mut TokenReader) -> Option<Box<Node>> {
     let ident_node = gen_ident_node_with_unknown_typ(tok);
-    return  Some(Box::new(Node {
+    return Some(Box::new(Node {
         kind: NodeKind::ND_PTR_REF,
         ptr_ref_ident: ident_node,
         ..Default::default()
-    }))
+    }));
 }
 
 // unary = &num | &ident | fn_call | ref | deref
@@ -796,7 +796,7 @@ fn parse_function(tok: &mut TokenReader) -> Function {
         let typ;
         let sym;
 
-        typ = tok.try_get_type().unwrap_or_else(|e | panic!("Err: {}", e));
+        typ = tok.try_get_type().unwrap_or_else(|e| panic!("Err: {}", e));
         if typ.is_ptr() {
             tok.next();
         }

@@ -107,9 +107,10 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_IDENT {
         // シンボル(node.str)に対応するアドレスからデータを取ってきて、stackにpushする.
-        if let Some(val) = lv.get_val_offset_by_identid_recursively(
-            blockstr_to_identid(node.str.clone(), node.block_str.clone()),
-        ) {
+        if let Some(val) = lv.get_val_offset_by_identid_recursively(blockstr_to_identid(
+            node.str.clone(),
+            node.block_str.clone(),
+        )) {
             writeln!(f, "lea -{}(%rbp), %rax", val.offset);
             writeln!(f, "mov (%rax), %rax");
             writeln!(f, "push %rax");
@@ -130,7 +131,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_PTR_REF {
         let src_node = node.ptr_ref_ident.clone().unwrap().as_ref().clone();
-        let ident_id = blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
+        let ident_id =
+            blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
 
         if let Some(val) = lv.get_val_offset_by_identid_recursively(ident_id) {
             writeln!(f, "leaq -{}(%rbp), %rax", val.offset);
@@ -142,7 +144,8 @@ fn gen(node: &Node, f: &mut File, lv: &mut FunctionLocalVariable, cl: &mut CodeL
     }
     if node.kind == NodeKind::ND_PTR_DEREF {
         let src_node = node.ptr_deref_ident.clone().unwrap().as_ref().clone();
-        let ident_id = blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
+        let ident_id =
+            blockstr_to_identid(src_node.str.clone(), src_node.block_str.clone());
 
         if let Some(val) = lv.get_val_offset_by_identid_recursively(ident_id) {
             writeln!(f, "mov -{}(%rbp), %rax", val.offset);

@@ -14,7 +14,7 @@ use tokenize::{debug_tokens, new_token_reader, tokenize, Token};
 use clap::{App, Arg};
 use std::{fs, io};
 
-fn main() -> Result<(), io::Error> {
+fn main() -> () {
     let matches = App::new("rcc")
         .author("Motoyuki Kimura")
         .about("A small C compiler")
@@ -72,5 +72,5 @@ fn main() -> Result<(), io::Error> {
     // generate assembly
     codegen(functions);
 
-    return Ok(());
+    ()
 }

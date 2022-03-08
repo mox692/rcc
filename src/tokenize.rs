@@ -148,7 +148,7 @@ pub enum Type {
     None,
     Unknown,
     INT,
-    PTR(Box<Type>)
+    PTR(Box<Type>),
 }
 impl Type {
     pub fn size(&self) -> usize {
@@ -160,8 +160,8 @@ impl Type {
     }
     pub fn is_ptr(&self) -> bool {
         match &self {
-            Type::PTR(_) => true,
-            _ => false
+            | Type::PTR(_) => true,
+            | _ => false,
         }
     }
 }
@@ -244,7 +244,7 @@ pub fn tokenize(string: String) -> Vec<Token> {
         if l.expect_and_read("//") {
             while !l.expect_and_read("\n") {
                 l.next();
-            }           
+            }
             continue;
         }
 
@@ -385,14 +385,19 @@ impl TokenReader {
     pub fn try_get_type(&mut self) -> Result<Type, String> {
         // どういうtypeか
         let t = match self.cur_tok().kind {
-            TokenKind::TYPE(t)  => t,
-            _ => return Err(format!("Expect Type, but got kind: {:?}", self.cur_tok().kind))
+            | TokenKind::TYPE(t) => t,
+            | _ => {
+                return Err(format!(
+                    "Expect Type, but got kind: {:?}",
+                    self.cur_tok().kind
+                ))
+            }
         };
 
         // pointerかpointer以外か
         match self.get_next_tok().char.as_str() {
-            "*" => Ok(Type::PTR(Box::new(t))),
-            _ => Ok(t),
+            | "*" => Ok(Type::PTR(Box::new(t))),
+            | _ => Ok(t),
         }
     }
 

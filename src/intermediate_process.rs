@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
-use crate::parse::{Function, Node, NodeKind};
-use crate::tokenize::Type;
+use crate::{
+    parse::{Function, Node, NodeKind},
+    tokenize::Type,
+};
 
 // IdentID is a unique label for Functino's local variable,
 // and generated from blockstr. This label holds variable's
@@ -19,8 +21,8 @@ impl Variable {
     fn new(offset: usize, typ: Type) -> Self {
         return Variable {
             offset: offset,
-            typ: typ
-        }
+            typ: typ,
+        };
     }
 }
 
@@ -56,7 +58,7 @@ impl FunctionLocalVariable {
                 self.current_offset += 8;
                 let v = Variable::new(self.current_offset, typ);
                 self.val_table.insert(ident_id.clone(), v.clone());
-                return Ok(v)
+                return Ok(v);
             }
         }
     }
@@ -76,7 +78,7 @@ impl FunctionLocalVariable {
         let mut current_ident_id = ident_id.clone();
         for _ in 0..depth {
             if let Some(val) = self.val_table.get(&current_ident_id) {
-                return Some(val.clone())
+                return Some(val.clone());
             }
             // currentのdepthにない場合、current_ident_idを更新
             match upper_block_ident_id(&current_ident_id) {
@@ -251,12 +253,13 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         // TODO: 多分使わなくなる
         node.block_str = arg.cur_block_str.clone();
 
-        let ident_id =
-            blockstr_to_identid(node.str.clone(), arg.cur_block_str.clone());
-        if let Some(val) = arg.local_variable.get_val_offset_by_identid_recursively(ident_id.clone()) {
+        let ident_id = blockstr_to_identid(node.str.clone(), arg.cur_block_str.clone());
+        if let Some(val) = arg
+            .local_variable
+            .get_val_offset_by_identid_recursively(ident_id.clone())
+        {
             node.typ = val.typ
-        } 
-
+        }
 
         // TODO: 型を導入する時に改善/
         arg.val_size += 8;
@@ -285,11 +288,11 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
     }
     if node.kind == NodeKind::ND_PTR_REF {
         read_node(&mut node.ptr_ref_ident.as_mut().unwrap(), arg);
-        return;       
+        return;
     }
     if node.kind == NodeKind::ND_PTR_DEREF {
         read_node(&mut node.ptr_deref_ident.as_mut().unwrap(), arg);
-        return;       
+        return;
     }
 
     /*
@@ -364,10 +367,11 @@ fn read_node(node: &mut Node, arg: &mut ReadNodeArgs) {
         // TODO: declnにblockstrがひっついている構造
         node.block_str = block_str.clone();
         // Err checkのため
-        let _ = match arg
-            .local_variable
-            .try_new_val_offset(node.l.as_ref().unwrap().str.clone(),Type::Unknown, block_str)
-        {
+        let _ = match arg.local_variable.try_new_val_offset(
+            node.l.as_ref().unwrap().str.clone(),
+            Type::Unknown,
+            block_str,
+        ) {
             | Ok(v) => v,
             | Err(_) => {
                 panic!("Symbol duplicated.")
